@@ -9,6 +9,9 @@ class AshscomGUI:
         self.root = root
         self.root.title("Ashscom Management System")
         self.root.geometry("800x600")
+        self.root.configure(bg="lightblue")
+        tk.Label(self.root, text="Ashscom Management System", font=("Arial", 20)).pack(pady=10)
+        
 
         # Create a connection to the database
         self.connection = create_connection()
@@ -50,7 +53,10 @@ class AshscomGUI:
         settings_label = ttk.Label(settings_frame, text="Application Settings", font=("Arial", 16))
         settings_label.pack(pady=20)
 
+
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = AshscomGUI(root)
     root.mainloop()
+

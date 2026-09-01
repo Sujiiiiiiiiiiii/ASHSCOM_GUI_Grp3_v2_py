@@ -9,8 +9,8 @@ class AshscomGUI:
         self.root = root
         self.root.title("Ashscom Management System")
         self.root.geometry("800x600")
-        self.root.configure(bg="lightblue")
-        tk.Label(self.root, text="Ashscom Management System", font=("Arial", 20)).pack(pady=10)
+        self.root.configure(bg="lightgreen")
+        tk.Label(self.root, text="Ashscom Management System", font=("Times New Roman", 25)).pack(pady=10)
         
 
         # Create a connection to the database

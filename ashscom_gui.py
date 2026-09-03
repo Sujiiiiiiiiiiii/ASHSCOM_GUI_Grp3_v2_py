@@ -9,9 +9,35 @@ class AshscomGUI:
         self.root = root
         self.root.title("Ashscom Management System")
         self.root.geometry("800x600")
-        self.root.configure(bg="lightgreen")
-        tk.Label(self.root, text="Ashscom Management System", font=("Times New Roman", 25)).pack(pady=10)
+        self.root.configure(bg="#ADFFB1")
+
+        header_frame = tk.Frame(self.root, bg="#ADFFB1")
+        header_frame.pack(fill="x")
+        header_frame.columnconfigure(0, weight=0)
+        header_frame.columnconfigure(1, weight=1)
+
+        logo1_img = Image.open("ateneo1.png").resize((60, 60))
+        self.logo1 = ImageTk.PhotoImage(logo1_img)
         
+        logo2_img = Image.open("ashscom.png").resize((80, 80))
+        self.logo2 = ImageTk.PhotoImage(logo2_img)
+
+        logo_frame = tk.Frame(header_frame, bg="#ADFFB1")
+        logo_frame.grid(row=0, column=0, sticky="w",padx=15, pady=10)
+
+        tk.Label(
+            logo_frame, image=self.logo1, bg="#ADFFB1").pack(side="left", padx=(5,0))
+        tk.Label(
+            logo_frame, image=self.logo2, bg="#ADFFB1").pack(side="left", padx=(0,5))
+
+        text_frame = tk.Frame(header_frame, bg="#ADFFB1")
+        text_frame.grid(row=0, column=1, sticky="e", padx=15, pady=10)
+
+        tk.Label(text_frame, text="Ateneo De Davao University Senior High School\nCommission on Elections\nASHSCOM MANAGEMENT SYSTEM",
+            font=("Segoe UI", 12, "bold"), bg="#ADFFB1", fg="#004202", justify="right").pack(anchor="e", pady=(0, 0))
+
+        divider = tk.Frame(self.root, bg="darkgreen", height=3)
+        divider.pack(fill="x")
 
         # Create a connection to the database
         self.connection = create_connection()
@@ -52,7 +78,6 @@ class AshscomGUI:
         # Add content to the Settings tab
         settings_label = ttk.Label(settings_frame, text="Application Settings", font=("Arial", 16))
         settings_label.pack(pady=20)
-
 
 
 if __name__ == "__main__":

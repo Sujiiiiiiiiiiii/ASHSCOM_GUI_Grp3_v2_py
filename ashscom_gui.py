@@ -11,30 +11,44 @@ class AshscomGUI:
         self.root.geometry("800x600")
         self.root.configure(bg="#ADFFB1")
 
-        header_frame = tk.Frame(self.root, bg="#ADFFB1")
-        header_frame.pack(fill="x")
-        header_frame.columnconfigure(0, weight=0)
-        header_frame.columnconfigure(1, weight=1)
+        header_canvas = tk.Canvas(self.root, height=140, highlightthickness=0)
+        header_canvas.pack(fill="x")
 
-        logo1_img = Image.open("ateneo1.png").resize((60, 60))
+        logo1_img = Image.open("ateneo1.png").resize((80, 80))
         self.logo1 = ImageTk.PhotoImage(logo1_img)
-        
-        logo2_img = Image.open("ashscom.png").resize((80, 80))
+
+        logo2_img = Image.open("ashscom.png").resize((105, 105))
         self.logo2 = ImageTk.PhotoImage(logo2_img)
 
-        logo_frame = tk.Frame(header_frame, bg="#ADFFB1")
-        logo_frame.grid(row=0, column=0, sticky="w",padx=15, pady=10)
+        def redraw_header(event):
+            width = event.width
+            height = 140
+            header_canvas.delete("all")  # clear everything and redraw fresh
 
-        tk.Label(
-            logo_frame, image=self.logo1, bg="#ADFFB1").pack(side="left", padx=(5,0))
-        tk.Label(
-            logo_frame, image=self.logo2, bg="#ADFFB1").pack(side="left", padx=(0,5))
+            # Gradient
+            r1, g1, b1 = self.root.winfo_rgb("#D4FFD9")
+            r2, g2, b2 = self.root.winfo_rgb("#7ED985")
+            for i in range(height):
+                nr = int(r1 + (r2 - r1) * i / height) >> 8
+                ng = int(g1 + (g2 - g1) * i / height) >> 8
+                nb = int(b1 + (b2 - b1) * i / height) >> 8
+                color = f'#{nr:02x}{ng:02x}{nb:02x}'
+                header_canvas.create_line(0, i, width, i, fill=color)
 
-        text_frame = tk.Frame(header_frame, bg="#ADFFB1")
-        text_frame.grid(row=0, column=1, sticky="e", padx=15, pady=10)
+            # Logos
+            header_canvas.create_image(35, 70, image=self.logo1, anchor="w")
+            header_canvas.create_image(115, 70, image=self.logo2, anchor="w")
 
-        tk.Label(text_frame, text="Ateneo De Davao University Senior High School\nCommission on Elections\nASHSCOM MANAGEMENT SYSTEM",
-            font=("Segoe UI", 12, "bold"), bg="#ADFFB1", fg="#004202", justify="right").pack(anchor="e", pady=(0, 0))
+            # Text - right-aligned using the CURRENT width, every time
+            right_x = width - 15
+            header_canvas.create_text(right_x, 40, text="Ateneo De Davao University Senior High School",
+                                       font=("Segoe UI", 12, "bold"), fill="#004202", anchor="e")
+            header_canvas.create_text(right_x, 62, text="Commission on Elections",
+                                       font=("Segoe UI", 12, "bold"), fill="#004202", anchor="e")
+            header_canvas.create_text(right_x, 100, text="ASHSCOM MANAGEMENT SYSTEM",
+                                       font=("Segoe UI", 23, "bold"), fill="#004202", anchor="e")
+
+        header_canvas.bind("<Configure>", redraw_header)
 
         divider = tk.Frame(self.root, bg="darkgreen", height=3)
         divider.pack(fill="x")

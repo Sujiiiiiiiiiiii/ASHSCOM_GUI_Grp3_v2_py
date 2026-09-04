@@ -184,7 +184,7 @@ class AshscomGUI:
             self.student_tree.delete(item)
         try:
             cursor = self.connection.cursor()
-            cursor.execute("SELECT id, name, grade_level, section FROM students")
+            cursor.execute("SELECT StudentID, StudentName, GradeLevel, Section FROM Student")
             rows = cursor.fetchall()
             for row in rows:
                 self.student_tree.insert("", tk.END, values=row)
@@ -207,7 +207,7 @@ class AshscomGUI:
             return
         try:
             cursor = self.connection.cursor()
-            cursor.execute("INSERT INTO students (name, grade_level, section) VALUES (%s, %s, %s)", (name, grade, section))
+            cursor.execute("INSERT INTO Student (StudentName, GradeLevel, Section) VALUES (%s, %s, %s)", (name, grade, section))
             self.connection.commit()
             cursor.close()
             messagebox.showinfo("Success", "Student added successfully.")
@@ -262,7 +262,7 @@ class AshscomGUI:
             return
         try:
             cursor = self.connection.cursor()
-            cursor.execute("UPDATE students SET name=%s, grade_level=%s, section=%s WHERE id=%s", (name, grade, section, student_id))
+            cursor.execute("UPDATE Student SET StudentName=%s, GradeLevel=%s, Section=%s WHERE StudentID=%s", (name, grade, section, student_id))
             self.connection.commit()
             cursor.close()
             messagebox.showinfo("Success", "Student updated successfully.")
@@ -281,7 +281,7 @@ class AshscomGUI:
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this student?"):
             try:
                 cursor = self.connection.cursor()
-                cursor.execute("DELETE FROM students WHERE id=%s", (student_id,))
+                cursor.execute("DELETE FROM Student WHERE StudentID=%s", (student_id,))
                 self.connection.commit()
                 cursor.close()
                 messagebox.showinfo("Success", "Student deleted successfully.")

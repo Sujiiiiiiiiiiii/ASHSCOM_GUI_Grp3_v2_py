@@ -9,7 +9,7 @@ def create_connection():
             host='127.0.0.1',
             user='root',
             password='root',
-            database='ashcommanagement'
+            database='ASHCOMManagement'
         )
         return connection
     except Error as e:
@@ -20,12 +20,14 @@ def create_connection():
             host='127.0.0.1',
             user='root',
             password='roots',
-            database='ashcommanagement'
+            database='ASHCOMManagement'
         )
-        return connection
+        if connection.is_connected():
+            return connection
     except Error as e:
         print(f"Error while connecting to MySQL: {e}")
-        return None
+
+    return connection
 
 if __name__ == "__main__":
     conn = create_connection()

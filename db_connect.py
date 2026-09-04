@@ -11,9 +11,21 @@ def create_connection():
             password='root',
             database='ashcommanagement'
         )
+        return connection
+    except Error as e:
+        pass
+
+    try:
+        connection = mysql.connector.connect(
+            host='127.0.0.1',
+            user='root',
+            password='roots',
+            database='ashcommanagement'
+        )
+        return connection
     except Error as e:
         print(f"Error while connecting to MySQL: {e}")
-    return connection
+        return None
 
 if __name__ == "__main__":
     conn = create_connection()

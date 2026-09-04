@@ -11,18 +11,18 @@ class AshscomGUI:
         self.root.geometry("800x600")
         self.root.configure(bg="#ADFFB1")
 
-        header_canvas = tk.Canvas(self.root, height=140, highlightthickness=0)
+        header_canvas = tk.Canvas(self.root, height=100, highlightthickness=0)
         header_canvas.pack(fill="x")
 
-        logo1_img = Image.open("ateneo1.png").resize((80, 80))
+        logo1_img = Image.open("ateneo1.png").resize((65, 65))
         self.logo1 = ImageTk.PhotoImage(logo1_img)
 
-        logo2_img = Image.open("ashscom.png").resize((105, 105))
+        logo2_img = Image.open("ashscom.png").resize((90, 90))
         self.logo2 = ImageTk.PhotoImage(logo2_img)
 
         def redraw_header(event):
             width = event.width
-            height = 140
+            height = 100
             header_canvas.delete("all")  # clear everything and redraw fresh
 
             # Gradient
@@ -36,16 +36,16 @@ class AshscomGUI:
                 header_canvas.create_line(0, i, width, i, fill=color)
 
             # Logos
-            header_canvas.create_image(35, 70, image=self.logo1, anchor="w")
-            header_canvas.create_image(115, 70, image=self.logo2, anchor="w")
+            header_canvas.create_image(35, 50, image=self.logo1, anchor="w")
+            header_canvas.create_image(115, 50, image=self.logo2, anchor="w")
 
             # Text - right-aligned using the CURRENT width, every time
             right_x = width - 15
-            header_canvas.create_text(right_x, 40, text="Ateneo De Davao University Senior High School",
+            header_canvas.create_text(right_x, 28, text="Ateneo De Davao University Senior High School",
                                        font=("Segoe UI", 12, "bold"), fill="#004202", anchor="e")
-            header_canvas.create_text(right_x, 62, text="Commission on Elections",
+            header_canvas.create_text(right_x, 48, text="Commission on Elections",
                                        font=("Segoe UI", 12, "bold"), fill="#004202", anchor="e")
-            header_canvas.create_text(right_x, 100, text="ASHSCOM MANAGEMENT SYSTEM",
+            header_canvas.create_text(right_x, 75, text="ASHSCOM MANAGEMENT SYSTEM",
                                        font=("Segoe UI", 23, "bold"), fill="#004202", anchor="e")
 
         header_canvas.bind("<Configure>", redraw_header)

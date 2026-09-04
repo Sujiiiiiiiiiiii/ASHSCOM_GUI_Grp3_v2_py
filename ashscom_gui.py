@@ -62,8 +62,6 @@ class AshscomGUI:
 
         # Create students table if it doesn't exist
         self.create_students_table()
-        # Create committees table if it doesn't exist
-        self.create_committees_table()
 
         # Create a notebook (tabbed interface)
         self.notebook = ttk.Notebook(self.root)
@@ -90,20 +88,6 @@ class AshscomGUI:
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to create table: {e}")
 
-    def create_committees_table(self):
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS committees (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL
-                )
-            """)
-            self.connection.commit()
-            cursor.close()
-        except Error as e:
-            messagebox.showerror("Database Error", f"Failed to create table: {e}")
-
     def create_home_tab(self):
         home_frame = ttk.Frame(self.notebook)
         self.notebook.add(home_frame, text="Home")
@@ -116,24 +100,8 @@ class AshscomGUI:
         users_frame = ttk.Frame(self.notebook)
         self.notebook.add(users_frame, text="Users")
 
-        # Create a canvas with a vertical scrollbar
-        canvas = tk.Canvas(users_frame)
-        scrollbar = ttk.Scrollbar(users_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
         # Create a LabelFrame for the Add Student section
-        add_student_frame = ttk.LabelFrame(scrollable_frame, text="Add Student")
+        add_student_frame = ttk.LabelFrame(users_frame, text="Add Student")
         add_student_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Form fields
@@ -201,64 +169,6 @@ class AshscomGUI:
 
         # Load initial data
         self.load_students()
-
-        # Create a LabelFrame for the Add committee section
-        add_committee_frame = ttk.LabelFrame(scrollable_frame, text="Add committee")
-        add_committee_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Form fields for committee
-        ttk.Label(add_committee_frame, text="Committee Name:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.committee_name_entry = ttk.Entry(add_committee_frame, width=30)
-        self.committee_name_entry.grid(row=0, column=1, padx=5, pady=5)
-
-        # Add committee button
-        ttk.Button(add_committee_frame, text="Add committee", command=self.add_committee).grid(row=1, column=0, columnspan=2, pady=10)
-
-        # Treeview to display committees
-        committee_tree_frame = ttk.Frame(add_committee_frame)
-        committee_tree_frame.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
-        add_committee_frame.grid_rowconfigure(2, weight=1)
-        add_committee_frame.grid_columnconfigure(1, weight=1)
-
-        # Scrollbars
-        committee_tree_scroll_y = ttk.Scrollbar(committee_tree_frame)
-        committee_tree_scroll_y.pack(side="right", fill="y")
-        committee_tree_scroll_x = ttk.Scrollbar(committee_tree_frame, orient="horizontal")
-        committee_tree_scroll_x.pack(side="bottom", fill="x")
-
-        # Treeview for committees
-        self.committee_tree = ttk.Treeview(committee_tree_frame, yscrollcommand=committee_tree_scroll_y.set, xscrollcommand=committee_tree_scroll_x.set, selectmode="browse")
-        self.committee_tree.pack(fill="both", expand=True)
-
-        committee_tree_scroll_y.config(command=self.committee_tree.yview)
-        committee_tree_scroll_x.config(command=self.committee_tree.xview)
-
-        # Define columns for committee tree
-        self.committee_tree['columns'] = ("id", "name")
-        self.committee_tree.column("#0", width=0, stretch=tk.NO)  # hidden column
-        self.committee_tree.column("id", width=50, anchor=tk.CENTER)
-        self.committee_tree.column("name", width=200, anchor=tk.W)
-
-        # Headings
-        self.committee_tree.heading("#0", text="", anchor=tk.W)
-        self.committee_tree.heading("id", text="ID", anchor=tk.CENTER)
-        self.committee_tree.heading("name", text="Name", anchor=tk.W)
-
-        # Buttons for update and delete
-        committee_button_frame = ttk.Frame(add_committee_frame)
-        committee_button_frame.grid(row=3, column=0, columnspan=2, pady=5)
-
-        self.update_committee_btn = ttk.Button(committee_button_frame, text="Update Selected", command=self.update_committee, state="disabled")
-        self.update_committee_btn.pack(side="left", padx=5)
-
-        self.delete_committee_btn = ttk.Button(committee_button_frame, text="Delete Selected", command=self.delete_committee, state="disabled")
-        self.delete_committee_btn.pack(side="left", padx=5)
-
-        # Bind treeview selection
-        self.committee_tree.bind("<<TreeviewSelect>>", self.on_committee_select)
-
-        # Load initial data for committees
-        self.load_committees()
 
     def create_settings_tab(self):
         settings_frame = ttk.Frame(self.notebook)
@@ -379,96 +289,6 @@ class AshscomGUI:
                 self.load_students()
             except Error as e:
                 messagebox.showerror("Database Error", f"Failed to delete student: {e}")
-
-    def load_committees(self):
-        # Clear the treeview
-        for item in self.committee_tree.get_children():
-            self.committee_tree.delete(item)
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("SELECT id, name FROM committees")
-            rows = cursor.fetchall()
-            for row in rows:
-                self.committee_tree.insert("", tk.END, values=row)
-            cursor.close()
-        except Error as e:
-            messagebox.showerror("Database Error", f"Failed to load committees: {e}")
-
-    def add_committee(self):
-        name = self.committee_name_entry.get().strip()
-        if not name:
-            messagebox.showwarning("Input Error", "Committee name is required.")
-            return
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("INSERT INTO committees (name) VALUES (%s)", (name,))
-            self.connection.commit()
-            cursor.close()
-            messagebox.showinfo("Success", "Committee added successfully.")
-            self.clear_committee_form()
-            self.load_committees()
-        except Error as e:
-            messagebox.showerror("Database Error", f"Failed to add committee: {e}")
-
-    def clear_committee_form(self):
-        self.committee_name_entry.delete(0, tk.END)
-
-    def on_committee_select(self, event):
-        selected = self.committee_tree.focus()
-        if selected:
-            values = self.committee_tree.item(selected, 'values')
-            if values:
-                # Populate form with selected committee's data
-                self.committee_name_entry.delete(0, tk.END)
-                self.committee_name_entry.insert(0, values[1])
-                # Enable update and delete buttons
-                self.update_committee_btn.config(state="normal")
-                self.delete_committee_btn.config(state="normal")
-        else:
-            self.clear_committee_form()
-            self.update_committee_btn.config(state="disabled")
-            self.delete_committee_btn.config(state="disabled")
-
-    def update_committee(self):
-        selected = self.committee_tree.focus()
-        if not selected:
-            messagebox.showwarning("Selection Error", "Please select a committee to update.")
-            return
-        values = self.committee_tree.item(selected, 'values')
-        committee_id = values[0]
-        name = self.committee_name_entry.get().strip()
-        if not name:
-            messagebox.showwarning("Input Error", "Committee name is required.")
-            return
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("UPDATE committees SET name=%s WHERE id=%s", (name, committee_id))
-            self.connection.commit()
-            cursor.close()
-            messagebox.showinfo("Success", "Committee updated successfully.")
-            self.clear_committee_form()
-            self.load_committees()
-        except Error as e:
-            messagebox.showerror("Database Error", f"Failed to update committee: {e}")
-
-    def delete_committee(self):
-        selected = self.committee_tree.focus()
-        if not selected:
-            messagebox.showwarning("Selection Error", "Please select a committee to delete.")
-            return
-        values = self.committee_tree.item(selected, 'values')
-        committee_id = values[0]
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this committee?"):
-            try:
-                cursor = self.connection.cursor()
-                cursor.execute("DELETE FROM committees WHERE id=%s", (committee_id,))
-                self.connection.commit()
-                cursor.close()
-                messagebox.showinfo("Success", "Committee deleted successfully.")
-                self.clear_committee_form()
-                self.load_committees()
-            except Error as e:
-                messagebox.showerror("Database Error", f"Failed to delete committee: {e}")
 
 
 if __name__ == "__main__":

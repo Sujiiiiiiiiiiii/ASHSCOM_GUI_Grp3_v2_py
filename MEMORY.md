@@ -1,2 +1,1 @@
-- [Add Student CRUD Feature](add-student-crud-feature.md) — Added a CRUD feature for managing students in the Users tab, inside a scrollable area, in a section labeled 'Add Student'
-- [Add Committee CRUD Feature](add-committee-crud-feature.md) — Added a CRUD feature for managing committees in the Users tab, inside a scrollable area, in a section labeled 'Add committee'
+- [Add Student CRUD Feature](add-student-crud-feature.md) — Added a CRUD feature for managing students in the Users tab, inside a section labeled 'Add Student'

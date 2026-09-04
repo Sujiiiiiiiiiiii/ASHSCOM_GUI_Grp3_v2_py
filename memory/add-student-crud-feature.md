@@ -1,6 +1,6 @@
 ---
 name: add-student-crud-feature
-description: Added a CRUD feature for managing students in the Users tab, inside a scrollable area, in a section labeled 'Add Student'
+description: Added a CRUD feature for managing students in the Users tab, inside a section labeled 'Add Student'
 metadata:
   type: project
 ---

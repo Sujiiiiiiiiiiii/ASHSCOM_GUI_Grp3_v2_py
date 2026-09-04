@@ -79,8 +79,8 @@ class AshscomGUI:
                 CREATE TABLE IF NOT EXISTS students (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(255) NOT NULL,
-                    grade_level VARCHAR(50),
-                    section VARCHAR(50)
+                    grade_level VARCHAR(50) NOT NULL,
+                    section VARCHAR(50) NOT NULL
                 )
             """)
             self.connection.commit()
@@ -199,6 +199,12 @@ class AshscomGUI:
         if not name:
             messagebox.showwarning("Input Error", "Student name is required.")
             return
+        if not grade:
+            messagebox.showwarning("Input Error", "Grade level is required.")
+            return
+        if not section:
+            messagebox.showwarning("Input Error", "Section is required.")
+            return
         try:
             cursor = self.connection.cursor()
             cursor.execute("INSERT INTO students (name, grade_level, section) VALUES (%s, %s, %s)", (name, grade, section))
@@ -247,6 +253,12 @@ class AshscomGUI:
         section = self.section_entry.get().strip()
         if not name:
             messagebox.showwarning("Input Error", "Student name is required.")
+            return
+        if not grade:
+            messagebox.showwarning("Input Error", "Grade level is required.")
+            return
+        if not section:
+            messagebox.showwarning("Input Error", "Section is required.")
             return
         try:
             cursor = self.connection.cursor()

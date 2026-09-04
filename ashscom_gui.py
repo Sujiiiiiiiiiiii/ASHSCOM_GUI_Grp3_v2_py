@@ -150,7 +150,7 @@ class AshscomGUI:
         # Headings
         self.student_tree.heading("#0", text="", anchor=tk.W)
         self.student_tree.heading("id", text="ID", anchor=tk.CENTER)
-        self.student_tree.heading("name", text="Name", anchor=tk.W)
+        self.student_tree.heading("name", text="Name", anchor=tk.CENTER)
         self.student_tree.heading("grade_level", text="Grade Level", anchor=tk.CENTER)
         self.student_tree.heading("section", text="Section", anchor=tk.CENTER)
 

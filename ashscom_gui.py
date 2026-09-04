@@ -87,10 +87,10 @@ class AshscomGUI:
 
     def create_settings_tab(self):
         settings_frame = ttk.Frame(self.notebook)
-        self.notebook.add(settings_frame, text="Settings")
+        self.notebook.add(settings_frame, text="Assignment")
 
-        # Add content to the Settings tab
-        settings_label = ttk.Label(settings_frame, text="Application Settings", font=("Arial", 16))
+        # Add content to the Assignment tab
+        settings_label = ttk.Label(settings_frame, text="Assign Members to Task", font=("Arial", 16))
         settings_label.pack(pady=20)
 
 

@@ -192,6 +192,7 @@ class AshscomGUI:
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load students: {e}")
 
+# Student na
     def add_student(self):
         name = self.name_entry.get().strip()
         grade = self.grade_entry.get().strip()

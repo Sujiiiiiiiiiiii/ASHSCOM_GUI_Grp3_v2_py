@@ -106,11 +106,6 @@ class AshscomGUI:
         add_student_frame = ttk.LabelFrame(users_frame, text="Add Student")
         add_student_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
-        # Form fields
-        ttk.Label(add_student_frame, text="Student ID:").grid(row=0, column=0, padx=8, pady=8, sticky="w")
-        self.student_id_entry = ttk.Entry(add_student_frame, width=30)
-        self.student_id_entry.grid(row=0, column=1, padx=8, pady=8)
-
         ttk.Label(add_student_frame, text="Student Name:").grid(row=1, column=0, padx=8, pady=8, sticky="w")
         self.name_entry = ttk.Entry(add_student_frame, width=30)
         self.name_entry.grid(row=1, column=1, padx=8, pady=8)

@@ -10,6 +10,28 @@ class AshscomGUI:
         self.root.title("Ashscom Management System")
         self.root.geometry("800x600")
         self.root.configure(bg="#ADFFB1")
+        self.setup_styles()
+
+    def setup_styles(self):
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        style.configure("TLabelframe.Label", font=("Segoe UI", 12, "bold"), foreground="#004202")
+        style.configure("TLabel", font=("Segoe UI", 10))
+        style.configure("TEntry", padding=6)
+
+        style.configure("Add.TButton", font=("Segoe UI", 10, "bold"), padding=8, background="#7ED985", foreground="#004202")
+        style.map("Add.TButton", background=[("active", "#5FC46B")])
+
+        style.configure("Update.TButton", font=("Segoe UI", 10, "bold"), padding=8, background="#FFD966", foreground="#5C4400")
+        style.map("Update.TButton", background=[("active", "#E6C25C")])
+
+        style.configure("Delete.TButton", font=("Segoe UI", 10, "bold"), padding=8, background="#F27C7C", foreground="#5C0000")
+        style.map("Delete.TButton", background=[("active", "#D96666")])
+
+        style.configure("Treeview", font=("Segoe UI", 10), rowheight=28)
+        style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#7ED985", foreground="#004202")
+        style.map("Treeview.Heading", background=[("active", "#7ED985")])
 
         header_canvas = tk.Canvas(self.root, height=100, highlightthickness=0)
         header_canvas.pack(fill="x")
@@ -50,7 +72,7 @@ class AshscomGUI:
 
         header_canvas.bind("<Configure>", redraw_header)
 
-        divider = tk.Frame(self.root, bg="darkgreen", height=3)
+        divider = tk.Frame(self.root, bg="#004202", height=3)
         divider.pack(fill="x")
 
         # Create a connection to the database
@@ -60,9 +82,6 @@ class AshscomGUI:
             self.root.destroy()
             return
 
-        # Create students table if it doesn't exist
-        self.create_students_table()
-
         # Create a notebook (tabbed interface)
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(expand=True, fill='both')
@@ -71,22 +90,6 @@ class AshscomGUI:
         self.create_home_tab()
         self.create_users_tab()
         self.create_settings_tab()
-
-    def create_students_table(self):
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS students (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    grade_level VARCHAR(50) NOT NULL,
-                    section VARCHAR(50) NOT NULL
-                )
-            """)
-            self.connection.commit()
-            cursor.close()
-        except Error as e:
-            messagebox.showerror("Database Error", f"Failed to create table: {e}")
 
     def create_home_tab(self):
         home_frame = ttk.Frame(self.notebook)
@@ -100,74 +103,77 @@ class AshscomGUI:
         users_frame = ttk.Frame(self.notebook)
         self.notebook.add(users_frame, text="Users")
 
-        # Create a LabelFrame for the Add Student section
         add_student_frame = ttk.LabelFrame(users_frame, text="Add Student")
-        add_student_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        add_student_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
         # Form fields
-        ttk.Label(add_student_frame, text="Student Name:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(add_student_frame, text="Student ID:").grid(row=0, column=0, padx=8, pady=8, sticky="w")
+        self.student_id_entry = ttk.Entry(add_student_frame, width=30)
+        self.student_id_entry.grid(row=0, column=1, padx=8, pady=8)
+
+        ttk.Label(add_student_frame, text="Student Name:").grid(row=1, column=0, padx=8, pady=8, sticky="w")
         self.name_entry = ttk.Entry(add_student_frame, width=30)
-        self.name_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.name_entry.grid(row=1, column=1, padx=8, pady=8)
 
-        ttk.Label(add_student_frame, text="Grade Level:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(add_student_frame, text="Grade Level:").grid(row=2, column=0, padx=8, pady=8, sticky="w")
         self.grade_entry = ttk.Entry(add_student_frame, width=30)
-        self.grade_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.grade_entry.grid(row=2, column=1, padx=8, pady=8)
 
-        ttk.Label(add_student_frame, text="Section:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(add_student_frame, text="Section:").grid(row=3, column=0, padx=8, pady=8, sticky="w")
         self.section_entry = ttk.Entry(add_student_frame, width=30)
-        self.section_entry.grid(row=2, column=1, padx=5, pady=5)
+        self.section_entry.grid(row=3, column=1, padx=8, pady=8)
 
-        # Add Student button
-        ttk.Button(add_student_frame, text="Add Student", command=self.add_student).grid(row=3, column=0, columnspan=2, pady=10)
+        ttk.Button(add_student_frame, text="+ Add Student", style="Add.TButton",
+                   command=self.add_student).grid(row=4, column=0, columnspan=2, pady=12)
 
-        # Treeview to display students
+        # Treeview section
         tree_frame = ttk.Frame(add_student_frame)
-        tree_frame.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
-        add_student_frame.grid_rowconfigure(4, weight=1)
+        tree_frame.grid(row=5, column=0, columnspan=2, padx=8, pady=8, sticky="nsew")
+        add_student_frame.grid_rowconfigure(5, weight=1)
         add_student_frame.grid_columnconfigure(1, weight=1)
 
-        # Scrollbars
         tree_scroll_y = ttk.Scrollbar(tree_frame)
         tree_scroll_y.pack(side="right", fill="y")
         tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
         tree_scroll_x.pack(side="bottom", fill="x")
 
-        # Treeview
-        self.student_tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll_y.set, xscrollcommand=tree_scroll_x.set, selectmode="browse")
+        self.student_tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll_y.set,
+                                          xscrollcommand=tree_scroll_x.set, selectmode="browse")
         self.student_tree.pack(fill="both", expand=True)
 
         tree_scroll_y.config(command=self.student_tree.yview)
         tree_scroll_x.config(command=self.student_tree.xview)
 
-        # Define columns
         self.student_tree['columns'] = ("id", "name", "grade_level", "section")
-        self.student_tree.column("#0", width=0, stretch=tk.NO)  # hidden column
+        self.student_tree.column("#0", width=0, stretch=tk.NO)
         self.student_tree.column("id", width=50, anchor=tk.CENTER)
-        self.student_tree.column("name", width=150, anchor=tk.W)
-        self.student_tree.column("grade_level", width=80, anchor=tk.CENTER)
-        self.student_tree.column("section", width=80, anchor=tk.CENTER)
+        self.student_tree.column("name", width=180, anchor=tk.W)
+        self.student_tree.column("grade_level", width=100, anchor=tk.CENTER)
+        self.student_tree.column("section", width=100, anchor=tk.CENTER)
 
-        # Headings
         self.student_tree.heading("#0", text="", anchor=tk.W)
         self.student_tree.heading("id", text="ID", anchor=tk.CENTER)
         self.student_tree.heading("name", text="Name", anchor=tk.CENTER)
         self.student_tree.heading("grade_level", text="Grade Level", anchor=tk.CENTER)
         self.student_tree.heading("section", text="Section", anchor=tk.CENTER)
 
-        # Buttons for update and delete
+        # Alternating row stripes for readability
+        self.student_tree.tag_configure("evenrow", background="#F3FFF4")
+        self.student_tree.tag_configure("oddrow", background="#FFFFFF")
+
         button_frame = ttk.Frame(add_student_frame)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=5)
+        button_frame.grid(row=6, column=0, columnspan=2, pady=10)
 
-        self.update_btn = ttk.Button(button_frame, text="Update Selected", command=self.update_student, state="disabled")
-        self.update_btn.pack(side="left", padx=5)
+        self.update_btn = ttk.Button(button_frame, text="Update Selected", style="Update.TButton",
+                                      command=self.update_student, state="disabled")
+        self.update_btn.pack(side="left", padx=6)
 
-        self.delete_btn = ttk.Button(button_frame, text="Delete Selected", command=self.delete_student, state="disabled")
-        self.delete_btn.pack(side="left", padx=5)
+        self.delete_btn = ttk.Button(button_frame, text="Delete Selected", style="Delete.TButton",
+                                      command=self.delete_student, state="disabled")
+        self.delete_btn.pack(side="left", padx=6)
 
-        # Bind treeview selection
         self.student_tree.bind("<<TreeviewSelect>>", self.on_student_select)
 
-        # Load initial data
         self.load_students()
 
     def create_settings_tab(self):
@@ -179,20 +185,20 @@ class AshscomGUI:
         settings_label.pack(pady=20)
 
     def load_students(self):
-        # Clear the treeview
         for item in self.student_tree.get_children():
             self.student_tree.delete(item)
         try:
             cursor = self.connection.cursor()
             cursor.execute("SELECT StudentID, StudentName, GradeLevel, Section FROM Student")
             rows = cursor.fetchall()
-            for row in rows:
-                self.student_tree.insert("", tk.END, values=row)
+            for i, row in enumerate(rows):
+                tag = "evenrow" if i % 2 == 0 else "oddrow"
+                self.student_tree.insert("", tk.END, values=row, tags=(tag,))
             cursor.close()
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load students: {e}")
 
-# Student na
+# Student management methods
     def add_student(self):
         name = self.name_entry.get().strip()
         grade = self.grade_entry.get().strip()

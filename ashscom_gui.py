@@ -8,7 +8,7 @@ class AshscomGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Ashscom Management System")
-        self.root.geometry("800x600")
+        self.root.geometry("1200x700")
         self.root.configure(bg="#ADFFB1")
         self.setup_styles()
         self.root.configure(bg="#F7FFF9")
@@ -35,7 +35,9 @@ class AshscomGUI:
         style.map("Update.TButton", background=[("active", "#E6C25C")])
 
         style.configure("Delete.TButton", font=("Segoe UI", 10, "bold"), padding=8, background="#F27C7C", foreground="#5C0000")
-        style.map("Delete.TButton", background=[("active", "#D96666")])
+        style.map("Delete.TButton",
+                  background=[("active", "#D96666"), ("disabled", "#F2A6A6")],
+                  foreground=[("disabled", "#8B3A3A")])
 
         style.configure("Treeview", font=("Segoe UI", 10), rowheight=28)
         style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#7ED985", foreground="#004202")
@@ -166,36 +168,36 @@ class AshscomGUI:
         overview_frame.rowconfigure(0, weight=1)
 
         # --- LEFT: Edit form ---
-        form_frame = ttk.LabelFrame(overview_frame, text="Edit Student")
-        form_frame.grid(row=0, column=0, sticky="ns", padx=(10, 5), pady=10)
+        form_frame = ttk.LabelFrame(overview_frame, text="Update Student")
+        form_frame.grid(row=0, column=0, sticky="n", padx=(10, 5), pady=10)
 
         ttk.Label(form_frame, text="Student Name:").pack(anchor="w", padx=10, pady=(10, 2))
         self.edit_name_entry = ttk.Entry(form_frame, width=25)
-        self.edit_name_entry.pack(padx=10, pady=(0, 8))
+        self.edit_name_entry.pack(padx=10, pady=(0, 4))
 
         ttk.Label(form_frame, text="Grade Level:").pack(anchor="w", padx=10, pady=(0, 2))
         self.edit_grade_entry = ttk.Entry(form_frame, width=25)
-        self.edit_grade_entry.pack(padx=10, pady=(0, 8))
+        self.edit_grade_entry.pack(padx=10, pady=(0, 4))
 
         ttk.Label(form_frame, text="Section:").pack(anchor="w", padx=10, pady=(0, 2))
         self.edit_section_entry = ttk.Entry(form_frame, width=25)
-        self.edit_section_entry.pack(padx=10, pady=(0, 8))
+        self.edit_section_entry.pack(padx=10, pady=(0, 4))
 
         ttk.Label(form_frame, text="Addu Email:").pack(anchor="w", padx=10, pady=(0, 2))
         self.edit_email_entry = ttk.Entry(form_frame, width=25)
-        self.edit_email_entry.pack(padx=10, pady=(0, 8))
+        self.edit_email_entry.pack(padx=10, pady=(0, 4))
 
         ttk.Label(form_frame, text="Committee:").pack(anchor="w", padx=10, pady=(0, 2))
         self.edit_committee_combo = ttk.Combobox(form_frame, width=22, state="readonly")
         self.edit_committee_combo['values'] = self.load_committees()
-        self.edit_committee_combo.pack(padx=10, pady=(0, 8))
+        self.edit_committee_combo.pack(padx=10, pady=(0, 4))
 
         ttk.Label(form_frame, text="Role:").pack(anchor="w", padx=10, pady=(0, 2))
         self.edit_role_combo = ttk.Combobox(form_frame, width=22, state="readonly",
                                              values=["Election Candidate", "Chairperson", "Secretary-General", "Finance Officer",
                                                      "G12 Commissioner", "G11 Commissioner", "Public Information Officer",
                                                      "Auditor", "Committee Head Commissioner", "Asst. Committee Head Commissioner", "Member"])
-        self.edit_role_combo.pack(padx=10, pady=(0, 12))
+        self.edit_role_combo.pack(padx=10, pady=(0, 15))
 
         self.update_btn = ttk.Button(form_frame, text="Update Selected", style="Update.TButton",
                                       command=self.update_student, state="disabled")
@@ -207,13 +209,13 @@ class AshscomGUI:
 
         # --- RIGHT: View switcher + single table ---
         right_col = ttk.Frame(overview_frame)
-        right_col.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
+        right_col.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
 
         view_row = ttk.Frame(right_col)
-        view_row.pack(fill="x", pady=(0, 8))
-        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 8))
+        view_row.pack(fill="x", pady=(10, 8))
+        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 4))
         self.view_combo = ttk.Combobox(view_row, width=20, state="readonly",
-                                        values=["All Students", "ASHSCOM Members"])
+                                        values=["All Students", "ASHSCOM Members", "Election Candidates", "Committee Heads"])
         self.view_combo.set("All Students")
         self.view_combo.pack(side="left")
         self.view_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_table_view())
@@ -229,20 +231,24 @@ class AshscomGUI:
 
         tree_scroll_y = ttk.Scrollbar(tree_frame)
         tree_scroll_y.pack(side="right", fill="y")
+        tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
+        tree_scroll_x.pack(side="bottom", fill="x")
 
-        tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll_y.set, selectmode="browse")
+        tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll_y.set,
+                             xscrollcommand=tree_scroll_x.set, selectmode="browse")
         tree.pack(fill="both", expand=True)
         tree_scroll_y.config(command=tree.yview)
+        tree_scroll_x.config(command=tree.xview)
 
         tree['columns'] = ("id", "name", "grade_level", "section", "addu_email", "committee", "role")
         tree.column("#0", width=0, stretch=tk.NO)
-        tree.column("id", width=35, anchor=tk.CENTER)
-        tree.column("name", width=110, anchor=tk.W)
-        tree.column("grade_level", width=60, anchor=tk.CENTER)
-        tree.column("section", width=60, anchor=tk.CENTER)
-        tree.column("addu_email", width=130, anchor=tk.W)
-        tree.column("committee", width=90, anchor=tk.CENTER)
-        tree.column("role", width=120, anchor=tk.CENTER)
+        tree.column("id", width=50, anchor=tk.CENTER, stretch=False)
+        tree.column("name", width=200, anchor=tk.W, stretch=False)
+        tree.column("grade_level", width=80, anchor=tk.CENTER, stretch=False)
+        tree.column("section", width=100, anchor=tk.CENTER, stretch=False)
+        tree.column("addu_email", width=220, anchor=tk.W, stretch=False)
+        tree.column("committee", width=140, anchor=tk.CENTER, stretch=False)
+        tree.column("role", width=180, anchor=tk.CENTER, stretch=False)
 
         tree.heading("id", text="ID", anchor=tk.CENTER)
         tree.heading("name", text="Name", anchor=tk.CENTER)
@@ -325,6 +331,8 @@ class AshscomGUI:
 
             self._all_students_rows = [row[:7] for row in rows]
             self._members_rows = [row[:7] for row in rows if row[7] is not None]
+            self._candidates_rows = [row[:7] for row in rows if row[6] == "Election Candidate"]
+            self._heads_rows = [row[:7] for row in rows if row[6] in ("Committee Head Commissioner", "Asst. Committee Head Commissioner")]
 
             self.refresh_table_view()
         except Error as e:
@@ -334,7 +342,15 @@ class AshscomGUI:
         for item in self.student_tree.get_children():
             self.student_tree.delete(item)
 
-        data = self._members_rows if self.view_combo.get() == "ASHSCOM Members" else self._all_students_rows
+        selected_view = self.view_combo.get()
+        if selected_view == "ASHSCOM Members":
+            data = self._members_rows
+        elif selected_view == "Election Candidates":
+            data = self._candidates_rows
+        elif selected_view == "Committee Heads":
+            data = self._heads_rows
+        else:
+            data = self._all_students_rows
 
         for i, row in enumerate(data):
             tag = "evenrow" if i % 2 == 0 else "oddrow"
@@ -382,8 +398,8 @@ class AshscomGUI:
                            (name, grade, section, email))
             new_student_id = cursor.lastrowid
 
-            if committee_name:
-                committee_id = next((cid for cid, cname in self.committees_list if cname == committee_name), None)
+            if committee_name or role:
+                committee_id = next((cid for cid, cname in self.committees_list if cname == committee_name), None) if committee_name else None
                 cursor.execute(
                     "INSERT INTO Member (StudentID, CommitteeID, OfficerRole) VALUES (%s, %s, %s)",
                     (new_student_id, committee_id, role if role else "Member")
@@ -466,8 +482,8 @@ class AshscomGUI:
             cursor.execute("UPDATE Student SET StudentName=%s, GradeLevel=%s, Section=%s, AdduEmail=%s WHERE StudentID=%s",
                            (name, grade, section, email, student_id))
 
-            if committee_name:
-                committee_id = next((cid for cid, cname in self.committees_list if cname == committee_name), None)
+            if committee_name or role:
+                committee_id = next((cid for cid, cname in self.committees_list if cname == committee_name), None) if committee_name else None
                 cursor.execute("""
                     INSERT INTO Member (StudentID, CommitteeID, OfficerRole) VALUES (%s, %s, %s)
                     ON DUPLICATE KEY UPDATE CommitteeID=%s, OfficerRole=%s

@@ -161,13 +161,11 @@ class AshscomGUI:
         overview_frame = ttk.LabelFrame(settings_frame, text="Student Management")
         overview_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
-        # 3-column layout: form (left) | all students (center) | ASHSCOM members (right)
         overview_frame.columnconfigure(0, weight=0)
         overview_frame.columnconfigure(1, weight=1)
-        overview_frame.columnconfigure(2, weight=1)
         overview_frame.rowconfigure(0, weight=1)
 
-        # --- LEFT: Edit form, stacked vertically ---
+        # --- LEFT: Edit form ---
         form_frame = ttk.LabelFrame(overview_frame, text="Edit Student")
         form_frame.grid(row=0, column=0, sticky="ns", padx=(10, 5), pady=10)
 
@@ -207,19 +205,21 @@ class AshscomGUI:
                                       command=self.delete_student, state="disabled")
         self.delete_btn.pack(fill="x", padx=10, pady=(0, 10))
 
-        # --- CENTER: All Students table ---
-        students_col = ttk.LabelFrame(overview_frame, text="All Students")
-        students_col.grid(row=0, column=1, sticky="nsew", padx=5, pady=10)
+        # --- RIGHT: View switcher + single table ---
+        right_col = ttk.Frame(overview_frame)
+        right_col.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
 
-        self.student_tree = self._build_tree(students_col)
+        view_row = ttk.Frame(right_col)
+        view_row.pack(fill="x", pady=(0, 8))
+        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 8))
+        self.view_combo = ttk.Combobox(view_row, width=20, state="readonly",
+                                        values=["All Students", "ASHSCOM Members"])
+        self.view_combo.set("All Students")
+        self.view_combo.pack(side="left")
+        self.view_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_table_view())
+
+        self.student_tree = self._build_tree(right_col)
         self.student_tree.bind("<<TreeviewSelect>>", lambda e: self.on_student_select(self.student_tree))
-
-        # --- RIGHT: ASHSCOM Members table (only students with a committee) ---
-        members_col = ttk.LabelFrame(overview_frame, text="ASHSCOM Members")
-        members_col.grid(row=0, column=2, sticky="nsew", padx=(5, 10), pady=10)
-
-        self.members_tree = self._build_tree(members_col)
-        self.members_tree.bind("<<TreeviewSelect>>", lambda e: self.on_student_select(self.members_tree))
 
         self.load_students()
 
@@ -311,10 +311,6 @@ class AshscomGUI:
         settings_label.pack(pady=20)
 
     def load_students(self):
-        for item in self.student_tree.get_children():
-            self.student_tree.delete(item)
-        for item in self.members_tree.get_children():
-            self.members_tree.delete(item)
         try:
             cursor = self.connection.cursor()
             cursor.execute("""
@@ -325,15 +321,24 @@ class AshscomGUI:
                 LEFT JOIN Committee c ON m.CommitteeID = c.CommitteeID
             """)
             rows = cursor.fetchall()
-            for i, row in enumerate(rows):
-                display_row = row[:7]  # drop CommitteeID, it's just for filtering below
-                tag = "evenrow" if i % 2 == 0 else "oddrow"
-                self.student_tree.insert("", tk.END, values=display_row, tags=(tag,))
-                if row[7] is not None:  # has an actual CommitteeID = a real ASHSCOM member
-                    self.members_tree.insert("", tk.END, values=display_row, tags=(tag,))
             cursor.close()
+
+            self._all_students_rows = [row[:7] for row in rows]
+            self._members_rows = [row[:7] for row in rows if row[7] is not None]
+
+            self.refresh_table_view()
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load students: {e}")
+
+    def refresh_table_view(self):
+        for item in self.student_tree.get_children():
+            self.student_tree.delete(item)
+
+        data = self._members_rows if self.view_combo.get() == "ASHSCOM Members" else self._all_students_rows
+
+        for i, row in enumerate(data):
+            tag = "evenrow" if i % 2 == 0 else "oddrow"
+            self.student_tree.insert("", tk.END, values=row, tags=(tag,))
 
     def load_committees(self):
         self.committees_list = []

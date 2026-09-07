@@ -169,7 +169,7 @@ class AshscomGUI:
 
         # --- LEFT: Edit form ---
         form_frame = ttk.LabelFrame(overview_frame, text="Update Student")
-        form_frame.grid(row=0, column=0, sticky="n", padx=(10, 5), pady=10)
+        form_frame.grid(row=0, column=0, sticky="new", padx=(10, 5), pady=10)
 
         ttk.Label(form_frame, text="Student Name:").pack(anchor="w", padx=10, pady=(10, 2))
         self.edit_name_entry = ttk.Entry(form_frame, width=25)
@@ -213,7 +213,7 @@ class AshscomGUI:
 
         view_row = ttk.Frame(right_col)
         view_row.pack(fill="x", pady=(10, 8))
-        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 4))
+        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 0))
         self.view_combo = ttk.Combobox(view_row, width=20, state="readonly",
                                         values=["All Students", "ASHSCOM Members", "Election Candidates", "Committee Heads"])
         self.view_combo.set("All Students")
@@ -227,7 +227,7 @@ class AshscomGUI:
 
     def _build_tree(self, parent):
         tree_frame = ttk.Frame(parent)
-        tree_frame.pack(fill="both", expand=True, padx=8, pady=8)
+        tree_frame.pack(fill="both", expand=True, padx=8, pady=(0, 13))
 
         tree_scroll_y = ttk.Scrollbar(tree_frame)
         tree_scroll_y.pack(side="right", fill="y")

@@ -384,8 +384,26 @@ class AshscomGUI:
         settings_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["task/assignment"] = settings_frame
 
-        settings_label = ttk.Label(settings_frame, text="Assign Members to Task", font=("Arial", 16))
-        settings_label.pack(pady=20)
+        # Create a container for the two sections
+        container = ttk.Frame(settings_frame)
+        container.pack(fill="both", expand=True, padx=15, pady=15)
+        container.columnconfigure(0, weight=1)
+        container.rowconfigure(0, weight=1)
+        container.rowconfigure(1, weight=1)
+
+        # --- Task Management section (top) ---
+        task_management_frame = ttk.LabelFrame(container, text="Task Management")
+        task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
+
+        # Placeholder label
+        ttk.Label(task_management_frame, text="Placeholder").pack(expand=True, padx=20, pady=20)
+
+        # --- Assignment Management section (bottom) ---
+        assignment_management_frame = ttk.LabelFrame(container, text="Assignment Management")
+        assignment_management_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
+
+        # Placeholder label
+        ttk.Label(assignment_management_frame, text="Placeholder").pack(expand=True, padx=20, pady=20)
 
     def load_students(self):
         try:

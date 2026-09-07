@@ -1593,50 +1593,7 @@ class AshscomGUI:
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to assign task: {e}")
      
-
-        # Results Table
-        columns = ("task_id", "title", "assigned_to", "due_date", "status")
-        self.task_tree = ttk.Treeview(
-            table_frame,
-            columns=columns,
-            show="headings",
-            yscrollcommand=scrollbar.set
-        )
-        scrollbar.config(command=self.task_tree.yview)
-
-        # Column Headings
-        self.task_tree.heading("task_id", text="Task ID")
-        self.task_tree.heading("title", text="Task Title")
-        self.task_tree.heading("assigned_to", text="Assigned To")
-        self.task_tree.heading("due_date", text="Due Date")
-        self.task_tree.heading("status", text="Status")
-
-        # Column Widths
-        self.task_tree.column("task_id", width=80, anchor="center")
-        self.task_tree.column("title", width=200, anchor="w")
-        self.task_tree.column("assigned_to", width=150, anchor="w")
-        self.task_tree.column("due_date", width=100, anchor="center")
-        self.task_tree.column("status", width=100, anchor="center")
-
-        self.task_tree.pack(fill="both", expand=True)
-
-        # Load Data
-        self.load_task_results()
-
-        return page
-
-    def load_task_results(self):
-        for item in self.task_tree.get_children():
-            self.task_tree.delete(item)
-
-        sample_tasks = [
-            ("TSK-001", "Voter Registration Audit", "Electoral Operations", "2026-09-15", "In Progress"),
-            ("TSK-002", "Design Election Posters", "Creatives & Media", "2026-09-18", "Pending"),
-            ("TSK-003", "Prepare Ballot Boxes", "Logistics Committee", "2026-09-20", "Completed"),
-        ]
-
-        for task in sample_tasks:
-            self.task_tree.insert("", "end", values=task)
+     
 
 if __name__ == "__main__":
     root = tk.Tk()

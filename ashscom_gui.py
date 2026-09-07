@@ -1,8 +1,328 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from types import SimpleNamespace
 from PIL import Image, ImageTk
 from db_connect import create_connection
 from mysql.connector import Error
+
+# ---------------------------------------------------------------------------
+# Grade Level -> Sections map (alphabetical)
+# ---------------------------------------------------------------------------
+GRADE_SECTIONS = {
+    "Grade 11": [
+        "GARNET",
+        "GARNIER",
+        "GAVAN",
+        "GONZALES",
+        "HERNANDEZ",
+        "HOLLAND",
+        "HURTADO",
+        "ISORE",
+        "KASUI",
+        "KIMURA",
+        "KISAI",
+        "KOSTKA",
+        "LALEMANT",
+        "LEWIS",
+        "MANGIN",
+        "MAUNOIR",
+        "MAYER",
+        "MIKI",
+        "MORSE",
+        "NAKAURA",
+        "NAVARRO",
+        "OGILVIE",
+        "OLDCORNE",
+        "OTA",
+        "OWEN",
+        "PACHECO",
+        "PAGE",
+        "PANTALIA",
+        "PEREZ",
+        "PIGNATELLI",
+        "PONGRACZ",
+        "PRO",
+        "REALINO",
+        "REGIS",
+        "RODRIGUEZ",
+        "RUBIO",
+        "RUIZ",
+        "RYOSETSU",
+        "SALES",
+        "SOUTHWELL",
+    ],
+    "Grade 12": [
+        "ACQUAVIVA",
+        "ANCHIETA",
+        "ANDLAUER",
+        "ANGELIS",
+        "ARANHA",
+        "ARROWSMITH",
+        "AZEVEDO",
+        "BALDINUCCI",
+        "BELLARMINE",
+        "BERCHMANS",
+        "BERTHIEU",
+        "BEYZYM",
+        "BOBOLA",
+        "BORGIA",
+        "BREBEUF",
+        "BRIANT",
+        "BRITO",
+        "CALUNGSOD",
+        "CAMPION",
+        "CANISIUS",
+        "CHABANEL",
+        "COLLINS",
+        "COLOMBIERE",
+        "CORBY",
+        "COTTAM",
+        "DAJANI",
+        "DANIEL",
+        "DE HOYOS",
+        "DEL CASTILLO",
+        "DENN",
+        "ESCRIBANO",
+        "EVANS",
+        "FAUSTI",
+        "FAVRE",
+        "FERNANDO",
+        "FERRERES",
+        "FONTOURA",
+        "GARATE",
+        "GERONIMO",
+        "LOYOLA",
+    ],
+}
+GRADE_LEVELS = list(GRADE_SECTIONS.keys())
+
+
+class ModernDropdown(tk.Frame):
+    BORDER = "#7ED985"
+    BORDER_ACTIVE = "#7ED985"
+    TEXT = "#0F1A0F"
+    PLACEHOLDER = "#44A04C"
+    HOVER = "#B7ECBD"
+    SELECTED = "#6DB876"
+    ROW_HEIGHT = 28
+    MAX_VISIBLE_ROWS = 8
+
+    _active = None  
+
+    def __init__(self, master=None, width=20, state="readonly", values=None, **kwargs):
+        super().__init__(master, bg=self.BORDER, highlightthickness=0, bd=0)
+        self._values = list(values) if values else []
+        self._value = ""
+        self._callbacks = []
+        self._popup = None
+        self._click_id = None
+
+        inner = tk.Frame(self, bg="white")
+        inner.pack(fill="both", expand=True, padx=1, pady=1)
+
+        self._label = tk.Label(
+            inner,
+            text="",
+            anchor="w",
+            bg="white",
+            fg=self.PLACEHOLDER,
+            font=("Segoe UI", 10),
+            padx=10,
+            pady=7,
+            width=width,
+            cursor="hand2",
+        )
+        self._label.pack(side="left", fill="both", expand=True)
+
+        self._arrow = tk.Label(
+            inner,
+            text="\u25be",
+            bg="white",
+            fg="#6B6B6B",
+            font=("Segoe UI", 10),
+            padx=8,
+            cursor="hand2",
+        )
+        self._arrow.pack(side="right")
+
+        for w in (self, inner, self._label, self._arrow):
+            w.bind("<Button-1>", self._toggle)
+        for w in (self, inner, self._label, self._arrow):
+            w.bind("<Enter>", lambda e: self.config(bg=self.BORDER_ACTIVE))
+            w.bind("<Leave>", self._on_leave)
+
+        self._inner = inner
+        self._render()
+
+    # -- public API (mirrors the bits of ttk.Combobox this app relies on) --
+    def get(self):
+        return self._value
+
+    def set(self, value):
+        self._select(value if value else "", notify=False)
+
+    def current(self, index=None):
+        if index is None:
+            return (
+                self._values.index(self._value) if self._value in self._values else -1
+            )
+        if 0 <= index < len(self._values):
+            self._select(self._values[index], notify=False)
+
+    def __setitem__(self, key, value):
+        if key == "values":
+            self._values = list(value) if value else []
+            if self._value not in self._values:
+                self._select("", notify=False)
+
+    def __getitem__(self, key):
+        if key == "values":
+            return list(self._values)
+        return None
+
+    def bind(self, sequence=None, func=None, add=None):
+        if sequence == "<<ComboboxSelected>>":
+            self._callbacks.append(func)
+            return
+        return super().bind(sequence, func, add)
+
+    # -- internals --
+    def _on_leave(self, event=None):
+        if not (self._popup is not None and self._popup.winfo_exists()):
+            self.config(bg=self.BORDER)
+
+    def _render(self):
+        if self._value:
+            self._label.config(text=self._value, fg=self.TEXT)
+        else:
+            self._label.config(text="", fg=self.PLACEHOLDER)
+
+    def _select(self, value, notify=True):
+        self._value = value
+        self._render()
+        self._close_popup()
+        if notify:
+            evt = SimpleNamespace(widget=self)
+            for cb in list(self._callbacks):
+                if cb:
+                    cb(evt)
+
+    def _toggle(self, event=None):
+        if self._popup is not None:
+            self._close_popup()
+        else:
+            self._open_popup()
+
+    def _open_popup(self):
+        if not self._values:
+            return
+        if ModernDropdown._active is not None and ModernDropdown._active is not self:
+            ModernDropdown._active._close_popup()
+        ModernDropdown._active = self
+        self.config(bg=self.BORDER_ACTIVE)
+
+        x = self.winfo_rootx()
+        y = self.winfo_rooty() + self.winfo_height()
+        width = max(self.winfo_width(), 140)
+        visible_rows = min(len(self._values), self.MAX_VISIBLE_ROWS)
+        height = visible_rows * self.ROW_HEIGHT + 2
+
+        popup = tk.Toplevel(self)
+        popup.wm_overrideredirect(True)
+        popup.wm_geometry(f"{width}x{height}+{x}+{y}")
+        popup.config(bg=self.BORDER_ACTIVE)
+        self._popup = popup
+
+        frame = tk.Frame(popup, bg="white")
+        frame.pack(fill="both", expand=True, padx=1, pady=1)
+
+        needs_scroll = len(self._values) > self.MAX_VISIBLE_ROWS
+        canvas = tk.Canvas(frame, bg="white", highlightthickness=0)
+        canvas.pack(side="left", fill="both", expand=True)
+        list_frame = tk.Frame(canvas, bg="white")
+        canvas.create_window((0, 0), window=list_frame, anchor="nw", width=width - 2)
+
+        if needs_scroll:
+            scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+            scrollbar.pack(side="right", fill="y")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+        def on_wheel(event):
+            delta = 1 if getattr(event, "num", None) == 5 or event.delta < 0 else -1
+            canvas.yview_scroll(delta, "units")
+
+        for val in self._values:
+            row = tk.Label(
+                list_frame,
+                text=val,
+                anchor="w",
+                bg="white",
+                fg=self.TEXT,
+                font=("Segoe UI", 10),
+                padx=10,
+                pady=6,
+                cursor="hand2",
+            )
+            row.pack(fill="x")
+            if val == self._value:
+                row.config(bg=self.SELECTED)
+            row.bind(
+                "<Enter>",
+                lambda e, r=row, v=val: r.config(
+                    bg=self.HOVER if v != self._value else self.SELECTED
+                ),
+            )
+            row.bind(
+                "<Leave>",
+                lambda e, r=row, v=val: r.config(
+                    bg=self.SELECTED if v == self._value else "white"
+                ),
+            )
+            row.bind("<Button-1>", lambda e, v=val: self._select(v))
+            for w in (canvas, list_frame, row):
+                w.bind("<MouseWheel>", on_wheel)
+                w.bind("<Button-4>", on_wheel)
+                w.bind("<Button-5>", on_wheel)
+
+        list_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+        self._click_id = self.winfo_toplevel().bind_all(
+            "<Button-1>", self._on_global_click, add="+"
+        )
+
+    def _on_global_click(self, event):
+        if self._popup is None:
+            return
+
+        def is_descendant(widget, ancestor):
+            while widget is not None:
+                if widget == ancestor:
+                    return True
+                widget = getattr(widget, "master", None)
+            return False
+
+        widget_under = getattr(event, "widget", None)
+        if is_descendant(widget_under, self._popup) or is_descendant(
+            widget_under, self
+        ):
+            return
+        self._close_popup()
+
+    def _close_popup(self):
+        if self._popup is not None:
+            self._popup.destroy()
+            self._popup = None
+        if ModernDropdown._active is self:
+            ModernDropdown._active = None
+        if self._click_id is not None:
+            try:
+                self.winfo_toplevel().unbind_all("<Button-1>")
+            except Exception:
+                pass
+            self._click_id = None
+        self.config(bg=self.BORDER)
+
 
 class AshscomGUI:
     def __init__(self, root):
@@ -24,24 +344,76 @@ class AshscomGUI:
         style.configure("TNotebook", background="#F7FFF9")
         style.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=[12, 6])
 
-        style.configure("TLabelframe.Label", font=("Segoe UI", 12, "bold"), foreground="#004202")
+        style.configure(
+            "TLabelframe.Label",
+            font=("Segoe UI", 12, "bold"),
+            foreground="#004202",
+            background="#F7FFF9",
+        )
         style.configure("TLabel", font=("Segoe UI", 10))
-        style.configure("TEntry", padding=6)
+        style.configure("TEntry", padding=6, relief="flat", bordercolor="#7ED985")
+        style.map(
+            "TEntry",
+            bordercolor=[("focus", "#004202")],
+            lightcolor=[("focus", "#004202")],
+            darkcolor=[("focus", "#004202")],
+        )
 
-        style.configure("Add.TButton", font=("Segoe UI", 10, "bold"), padding=8, background="#7ED985", foreground="#004202")
+        style.configure(
+            "Add.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=8,
+            background="#7ED985",
+            foreground="#004202",
+        )
         style.map("Add.TButton", background=[("active", "#5FC46B")])
 
-        style.configure("Update.TButton", font=("Segoe UI", 10, "bold"), padding=8, background="#FFD966", foreground="#5C4400")
+        style.configure(
+            "Update.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=8,
+            background="#FFD966",
+            foreground="#5C4400",
+        )
         style.map("Update.TButton", background=[("active", "#E6C25C")])
 
-        style.configure("Delete.TButton", font=("Segoe UI", 10, "bold"), padding=8, background="#F27C7C", foreground="#5C0000")
-        style.map("Delete.TButton",
-                  background=[("active", "#D96666"), ("disabled", "#F2A6A6")],
-                  foreground=[("disabled", "#8B3A3A")])
+        style.configure(
+            "Delete.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=8,
+            background="#F27C7C",
+            foreground="#5C0000",
+        )
+        style.map(
+            "Delete.TButton",
+            background=[("active", "#D96666"), ("disabled", "#F2A6A6")],
+            foreground=[("disabled", "#8B3A3A")],
+        )
 
-        style.configure("Treeview", font=("Segoe UI", 10), rowheight=28)
-        style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#7ED985", foreground="#004202")
+        style.configure(
+            "Treeview",
+            font=("Segoe UI", 10),
+            rowheight=28,
+            background="white",
+            fieldbackground="white",
+            foreground="#0F1A0F",
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", "#D4FFD9")],
+            foreground=[("selected", "#004202")],
+        )
+        style.configure(
+            "Treeview.Heading",
+            font=("Segoe UI", 10, "bold"),
+            background="#7ED985",
+            foreground="#004202",
+        )
         style.map("Treeview.Heading", background=[("active", "#7ED985")])
+        self.root.option_add("*TEntry*selectBackground", "#D4FFD9")
+        self.root.option_add("*TEntry*selectForeground", "#004202")
+        self.root.option_add("*Entry.selectBackground", "#D4FFD9")
+        self.root.option_add("*Entry.selectForeground", "#004202")
 
         header_canvas = tk.Canvas(self.root, height=100, highlightthickness=0)
         header_canvas.pack(fill="x")
@@ -64,7 +436,7 @@ class AshscomGUI:
                 nr = int(r1 + (r2 - r1) * i / height) >> 8
                 ng = int(g1 + (g2 - g1) * i / height) >> 8
                 nb = int(b1 + (b2 - b1) * i / height) >> 8
-                color = f'#{nr:02x}{ng:02x}{nb:02x}'
+                color = f"#{nr:02x}{ng:02x}{nb:02x}"
                 header_canvas.create_line(0, i, width, i, fill=color)
 
             # Logos
@@ -73,12 +445,30 @@ class AshscomGUI:
 
             # Text - right-aligned using the CURRENT width, every time
             right_x = width - 15
-            header_canvas.create_text(right_x, 28, text="Ateneo De Davao University Senior High School",
-                                       font=("Segoe UI", 12, "bold"), fill="#017103", anchor="e")
-            header_canvas.create_text(right_x, 48, text="Commission on Elections",
-                                       font=("Segoe UI", 12, "bold"), fill="#017103", anchor="e")
-            header_canvas.create_text(right_x, 75, text="ASHSCOM MANAGEMENT SYSTEM",
-                                       font=("Segoe UI", 23, "bold"), fill="#005901", anchor="e")
+            header_canvas.create_text(
+                right_x,
+                28,
+                text="Ateneo De Davao University Senior High School",
+                font=("Segoe UI", 12, "bold"),
+                fill="#017103",
+                anchor="e",
+            )
+            header_canvas.create_text(
+                right_x,
+                48,
+                text="Commission on Elections",
+                font=("Segoe UI", 12, "bold"),
+                fill="#017103",
+                anchor="e",
+            )
+            header_canvas.create_text(
+                right_x,
+                75,
+                text="ASHSCOM MANAGEMENT SYSTEM",
+                font=("Segoe UI", 23, "bold"),
+                fill="#005901",
+                anchor="e",
+            )
 
         header_canvas.bind("<Configure>", redraw_header)
 
@@ -120,7 +510,11 @@ class AshscomGUI:
             self.nav_buttons[name].config(bg="#7ED985", fg="#000000")
             self.nav_accents[name].config(bg="#004202")
 
-        nav_buttons = [("👥  Students", "students"), ("➕  Add Student/Tasks", "add_student"), ("📋  Tasks/Assignments", "task/assignment")]
+        nav_buttons = [
+            ("👥  Students", "students"),
+            ("➕  Add Student/Tasks", "add_student"),
+            ("📋  Tasks/Assignments", "task/assignment"),
+        ]
         for label, key in nav_buttons:
             row = tk.Frame(sidebar, bg="#004202")
             row.pack(fill="x", pady=(4, 0))
@@ -130,10 +524,20 @@ class AshscomGUI:
             self.nav_accents[key] = accent
 
             btn = tk.Button(
-                row, text=label, font=("Segoe UI", 11, "bold"),
-                bg="#004202", fg="white", activebackground="#0A5C13", activeforeground="#7ED985",
-                bd=0, relief="flat", anchor="w", padx=18, pady=16, cursor="hand2",
-                command=lambda k=key: show_page(k)
+                row,
+                text=label,
+                font=("Segoe UI", 11, "bold"),
+                bg="#004202",
+                fg="white",
+                activebackground="#0A5C13",
+                activeforeground="#7ED985",
+                bd=0,
+                relief="flat",
+                anchor="w",
+                padx=18,
+                pady=16,
+                cursor="hand2",
+                command=lambda k=key: show_page(k),
             )
             btn.pack(side="left", fill="x", expand=True)
             self.nav_buttons[key] = btn
@@ -155,6 +559,25 @@ class AshscomGUI:
 
         show_page("students")
 
+    # -----------------------------------------------------------------
+    # Cascading Grade -> Section helper (alphabetical + no highlight)
+    # -----------------------------------------------------------------
+    def _on_grade_selected(self, grade_combo, section_combo, event=None):
+        grade = grade_combo.get()
+        sections = GRADE_SECTIONS.get(grade, [])
+        section_combo["values"] = sections
+        section_combo.set("")
+        try:
+            self.root.focus_set()
+        except Exception:
+            pass
+
+    def _clear_combo_highlight(self, event=None):
+        try:
+            self.root.focus_set()
+        except Exception:
+            pass
+
     def create_students_tab(self, parent):
         settings_frame = ttk.Frame(parent)
         settings_frame.grid(row=0, column=0, sticky="nsew")
@@ -171,41 +594,115 @@ class AshscomGUI:
         form_frame = ttk.LabelFrame(overview_frame, text="Update Student")
         form_frame.grid(row=0, column=0, sticky="new", padx=(10, 5), pady=(10, 11))
 
-        ttk.Label(form_frame, text="Student Name:").pack(anchor="w", padx=10, pady=(10, 2))
-        self.edit_name_entry = ttk.Entry(form_frame, width=25)
-        self.edit_name_entry.pack(padx=10, pady=(0, 4))
+        # inline grid layout — labels left, fields right (matches Add Student tab)
+        # Fixed label-column width + identical field width/padding/pady on every
+        # row so entries and comboboxes line up exactly under one another.
+        form_frame.columnconfigure(0, weight=0, minsize=110)
+        form_frame.columnconfigure(1, weight=1)
+        FIELD_WIDTH = 22
+        ROW_PADY = 6
 
-        ttk.Label(form_frame, text="Grade Level:").pack(anchor="w", padx=10, pady=(0, 2))
-        self.edit_grade_entry = ttk.Entry(form_frame, width=25)
-        self.edit_grade_entry.pack(padx=10, pady=(0, 4))
+        ttk.Label(form_frame, text="Student Name:").grid(
+            row=0, column=0, padx=10, pady=ROW_PADY, sticky="w"
+        )
+        self.edit_name_entry = ttk.Entry(form_frame, width=FIELD_WIDTH)
+        self.edit_name_entry.grid(row=0, column=1, padx=10, pady=ROW_PADY, sticky="ew")
 
-        ttk.Label(form_frame, text="Section:").pack(anchor="w", padx=10, pady=(0, 2))
-        self.edit_section_entry = ttk.Entry(form_frame, width=25)
-        self.edit_section_entry.pack(padx=10, pady=(0, 4))
+        ttk.Label(form_frame, text="Grade Level:").grid(
+            row=1, column=0, padx=10, pady=ROW_PADY, sticky="w"
+        )
+        self.edit_grade_entry = ModernDropdown(
+            form_frame, width=FIELD_WIDTH, state="readonly", values=GRADE_LEVELS
+        )
+        self.edit_grade_entry.grid(row=1, column=1, padx=10, pady=ROW_PADY, sticky="ew")
+        self.edit_grade_combo = self.edit_grade_entry
 
-        ttk.Label(form_frame, text="Addu Email:").pack(anchor="w", padx=10, pady=(0, 2))
-        self.edit_email_entry = ttk.Entry(form_frame, width=25)
-        self.edit_email_entry.pack(padx=10, pady=(0, 4))
+        ttk.Label(form_frame, text="Section:").grid(
+            row=2, column=0, padx=10, pady=ROW_PADY, sticky="w"
+        )
+        self.edit_section_entry = ModernDropdown(
+            form_frame, width=FIELD_WIDTH, state="readonly"
+        )
+        self.edit_section_entry.grid(
+            row=2, column=1, padx=10, pady=ROW_PADY, sticky="ew"
+        )
+        self.edit_section_combo = self.edit_section_entry
 
-        ttk.Label(form_frame, text="Committee:").pack(anchor="w", padx=10, pady=(0, 2))
-        self.edit_committee_combo = ttk.Combobox(form_frame, width=22, state="readonly")
-        self.edit_committee_combo['values'] = self.load_committees()
-        self.edit_committee_combo.pack(padx=10, pady=(0, 4))
+        self.edit_grade_entry.bind(
+            "<<ComboboxSelected>>",
+            lambda e: self._on_grade_selected(
+                self.edit_grade_entry, self.edit_section_entry, e
+            ),
+        )
+        self.edit_section_entry.bind(
+            "<<ComboboxSelected>>", self._clear_combo_highlight
+        )
 
-        ttk.Label(form_frame, text="Role:").pack(anchor="w", padx=10, pady=(0, 2))
-        self.edit_role_combo = ttk.Combobox(form_frame, width=22, state="readonly",
-                                             values=["Election Candidate", "Chairperson", "Secretary-General", "Finance Officer",
-                                                     "G12 Commissioner", "G11 Commissioner", "Public Information Officer",
-                                                     "Auditor", "Committee Head Commissioner", "Asst. Committee Head Commissioner", "Member"])
-        self.edit_role_combo.pack(padx=10, pady=(0, 15))
+        ttk.Label(form_frame, text="Addu Email:").grid(
+            row=3, column=0, padx=10, pady=ROW_PADY, sticky="w"
+        )
+        self.edit_email_entry = ttk.Entry(form_frame, width=FIELD_WIDTH)
+        self.edit_email_entry.grid(row=3, column=1, padx=10, pady=ROW_PADY, sticky="ew")
 
-        self.update_btn = ttk.Button(form_frame, text="Update Selected", style="Update.TButton",
-                                      command=self.update_student, state="disabled")
-        self.update_btn.pack(fill="x", padx=10, pady=(0, 6))
+        ttk.Label(form_frame, text="Committee:").grid(
+            row=4, column=0, padx=10, pady=ROW_PADY, sticky="w"
+        )
+        self.edit_committee_combo = ModernDropdown(
+            form_frame, width=FIELD_WIDTH, state="readonly"
+        )
+        self.edit_committee_combo["values"] = self.load_committees()
+        self.edit_committee_combo.grid(
+            row=4, column=1, padx=10, pady=ROW_PADY, sticky="ew"
+        )
 
-        self.delete_btn = ttk.Button(form_frame, text="Delete Selected", style="Delete.TButton",
-                                      command=self.delete_student, state="disabled")
-        self.delete_btn.pack(fill="x", padx=10, pady=(0, 10))
+        ttk.Label(form_frame, text="Role:").grid(
+            row=5, column=0, padx=10, pady=ROW_PADY, sticky="w"
+        )
+        self.edit_role_combo = ModernDropdown(
+            form_frame,
+            width=FIELD_WIDTH,
+            state="readonly",
+            values=[
+                "Election Candidate",
+                "Chairperson",
+                "Secretary-General",
+                "Finance Officer",
+                "G12 Commissioner",
+                "G11 Commissioner",
+                "Public Information Officer",
+                "Auditor",
+                "Committee Head Commissioner",
+                "Asst. Committee Head Commissioner",
+                "Member",
+            ],
+        )
+        self.edit_role_combo.grid(row=5, column=1, padx=10, pady=ROW_PADY, sticky="ew")
+        self.edit_committee_combo.bind(
+            "<<ComboboxSelected>>", self._clear_combo_highlight
+        )
+        self.edit_role_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
+
+        self.update_btn = ttk.Button(
+            form_frame,
+            text="Update Selected",
+            style="Update.TButton",
+            command=self.update_student,
+            state="disabled",
+        )
+        self.update_btn.grid(
+            row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
+        )
+
+        self.delete_btn = ttk.Button(
+            form_frame,
+            text="Delete Selected",
+            style="Delete.TButton",
+            command=self.delete_student,
+            state="disabled",
+        )
+        self.delete_btn.grid(
+            row=7, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="ew"
+        )
 
         # --- RIGHT: View switcher + single table ---
         right_col = ttk.Frame(overview_frame)
@@ -213,15 +710,31 @@ class AshscomGUI:
 
         view_row = ttk.Frame(right_col)
         view_row.pack(fill="x", pady=(10, 8))
-        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 0))
-        self.view_combo = ttk.Combobox(view_row, width=20, state="readonly",
-                                        values=["All Students", "ASHSCOM Members", "Election Candidates", "Committee Heads"])
+        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(
+            side="left", padx=(0, 5)
+        )
+        self.view_combo = ModernDropdown(
+            view_row,
+            width=20,
+            state="readonly",
+            values=[
+                "All Students",
+                "ASHSCOM Members",
+                "Election Candidates",
+                "Committee Heads",
+            ],
+        )
         self.view_combo.set("All Students")
         self.view_combo.pack(side="left")
-        self.view_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_table_view())
+        self.view_combo.bind(
+            "<<ComboboxSelected>>",
+            lambda e: (self.refresh_table_view(), self._clear_combo_highlight(e)),
+        )
 
         self.student_tree = self._build_tree(right_col)
-        self.student_tree.bind("<<TreeviewSelect>>", lambda e: self.on_student_select(self.student_tree))
+        self.student_tree.bind(
+            "<<TreeviewSelect>>", lambda e: self.on_student_select(self.student_tree)
+        )
 
         self.load_students()
 
@@ -234,13 +747,25 @@ class AshscomGUI:
         tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
         tree_scroll_x.pack(side="bottom", fill="x")
 
-        tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll_y.set,
-                             xscrollcommand=tree_scroll_x.set, selectmode="browse")
+        tree = ttk.Treeview(
+            tree_frame,
+            yscrollcommand=tree_scroll_y.set,
+            xscrollcommand=tree_scroll_x.set,
+            selectmode="browse",
+        )
         tree.pack(fill="both", expand=True)
         tree_scroll_y.config(command=tree.yview)
         tree_scroll_x.config(command=tree.xview)
 
-        tree['columns'] = ("id", "name", "grade_level", "section", "addu_email", "committee", "role")
+        tree["columns"] = (
+            "id",
+            "name",
+            "grade_level",
+            "section",
+            "addu_email",
+            "committee",
+            "role",
+        )
         tree.column("#0", width=0, stretch=tk.NO)
         tree.column("id", width=50, anchor=tk.CENTER, stretch=False)
         tree.column("name", width=200, anchor=tk.W, stretch=False)
@@ -262,13 +787,11 @@ class AshscomGUI:
         tree.tag_configure("oddrow", background="#FFFFFF")
         return tree
 
-
     def create_add_student_tab(self, parent):
         students_frame = ttk.Frame(parent)
         students_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["add_student"] = students_frame
 
-        # Create a container for two sections with some spacing
         container = ttk.Frame(students_frame)
         container.pack(fill="both", expand=True, padx=15, pady=15)
         container.columnconfigure(0, weight=1)
@@ -281,101 +804,189 @@ class AshscomGUI:
 
         entry_frame = ttk.Frame(add_student_frame)
         entry_frame.pack(fill="x", padx=10, pady=(10, 5))
+        # Grid-aligned: same 2-col grid as Update Student — fixes uneven padx/sticky
+        entry_frame.columnconfigure(0, weight=0, minsize=110)
+        entry_frame.columnconfigure(1, weight=1)
+        _FW = 22
+        _PY = 6
 
-        ttk.Label(entry_frame, text="Student Name:").grid(row=0, column=0, padx=8, pady=6, sticky="w")
-        self.name_entry = ttk.Entry(entry_frame, width=40)
-        self.name_entry.grid(row=0, column=1, padx=20, pady=6)
+        ttk.Label(entry_frame, text="Student Name:").grid(
+            row=0, column=0, padx=10, pady=_PY, sticky="w"
+        )
+        self.name_entry = ttk.Entry(entry_frame, width=_FW)
+        self.name_entry.grid(row=0, column=1, padx=10, pady=_PY, sticky="ew")
 
-        ttk.Label(entry_frame, text="Grade Level:").grid(row=1, column=0, padx=8, pady=6, sticky="w")
-        self.grade_entry = ttk.Entry(entry_frame, width=40)
-        self.grade_entry.grid(row=1, column=1, padx=20, pady=6)
+        ttk.Label(entry_frame, text="Grade Level:").grid(
+            row=1, column=0, padx=10, pady=_PY, sticky="w"
+        )
+        self.grade_entry = ModernDropdown(
+            entry_frame, width=_FW, state="readonly", values=GRADE_LEVELS
+        )
+        self.grade_entry.grid(row=1, column=1, padx=10, pady=_PY, sticky="ew")
+        self.grade_combo = self.grade_entry
 
-        ttk.Label(entry_frame, text="Section:").grid(row=2, column=0, padx=8, pady=6, sticky="w")
-        self.section_entry = ttk.Entry(entry_frame, width=40)
-        self.section_entry.grid(row=2, column=1, padx=20, pady=6)
+        ttk.Label(entry_frame, text="Section:").grid(
+            row=2, column=0, padx=10, pady=_PY, sticky="w"
+        )
+        self.section_entry = ModernDropdown(entry_frame, width=_FW, state="readonly")
+        self.section_entry.grid(row=2, column=1, padx=10, pady=_PY, sticky="ew")
+        self.section_combo = self.section_entry
 
-        ttk.Label(entry_frame, text="Addu Email:").grid(row=3, column=0, padx=8, pady=6, sticky="w")
-        self.email_entry = ttk.Entry(entry_frame, width=40)
-        self.email_entry.grid(row=3, column=1, padx=20, pady=6)
+        self.grade_entry.bind(
+            "<<ComboboxSelected>>",
+            lambda e: self._on_grade_selected(self.grade_entry, self.section_entry, e),
+        )
+        self.section_entry.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
 
-        ttk.Label(entry_frame, text="Committee:").grid(row=4, column=0, padx=8, pady=6, sticky="w")
-        self.committee_combo = ttk.Combobox(entry_frame, width=37, state="readonly")
-        self.committee_combo['values'] = self.load_committees()
-        self.committee_combo.grid(row=4, column=1, padx=20, pady=6)
+        ttk.Label(entry_frame, text="Addu Email:").grid(
+            row=3, column=0, padx=10, pady=_PY, sticky="w"
+        )
+        self.email_entry = ttk.Entry(entry_frame, width=_FW)
+        self.email_entry.grid(row=3, column=1, padx=10, pady=_PY, sticky="ew")
 
-        ttk.Label(entry_frame, text="Role:").grid(row=5, column=0, padx=8, pady=6, sticky="w")
-        self.role_combo = ttk.Combobox(entry_frame, width=37, state="readonly",
-                                        values=["Chairperson", "Secretary-General", "Finance Officer",
-                                                "G12 Commissioner", "G11 Commissioner", "Public Information Officer",
-                                                "Auditor", "Committee Head Commissioner", "Asst. Committee Head Commissioner", "Member"])
-        self.role_combo.grid(row=5, column=1, padx=20, pady=6)
+        ttk.Label(entry_frame, text="Committee:").grid(
+            row=4, column=0, padx=10, pady=_PY, sticky="w"
+        )
+        self.committee_combo = ModernDropdown(entry_frame, width=_FW, state="readonly")
+        self.committee_combo["values"] = self.load_committees()
+        self.committee_combo.grid(row=4, column=1, padx=10, pady=_PY, sticky="ew")
+
+        ttk.Label(entry_frame, text="Role:").grid(
+            row=5, column=0, padx=10, pady=_PY, sticky="w"
+        )
+        self.role_combo = ModernDropdown(
+            entry_frame,
+            width=_FW,
+            state="readonly",
+            values=[
+                "Chairperson",
+                "Secretary-General",
+                "Finance Officer",
+                "G12 Commissioner",
+                "G11 Commissioner",
+                "Public Information Officer",
+                "Auditor",
+                "Committee Head Commissioner",
+                "Asst. Committee Head Commissioner",
+                "Member",
+            ],
+        )
+        self.role_combo.grid(row=5, column=1, padx=10, pady=_PY, sticky="ew")
 
         button_frame = ttk.Frame(add_student_frame)
         button_frame.pack(fill="x", padx=10, pady=(5, 10))
 
-        ttk.Button(button_frame, text="+ Add Student", style="Add.TButton",
-                   command=self.add_student).pack(side="left", padx=8, ipadx=0)
+        self.committee_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
+        self.role_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
+
+        ttk.Button(
+            button_frame,
+            text="+ Add Student",
+            style="Add.TButton",
+            command=self.add_student,
+        ).pack(side="left", padx=8, ipadx=0)
 
         # --- Assign Tasks section (right) - Add Task Functionality ---
         assign_tasks_frame = ttk.LabelFrame(container, text="Assign Tasks")
         assign_tasks_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=5)
 
-        # Task Name Input
-        ttk.Label(assign_tasks_frame, text="Task Name:").grid(row=0, column=0, padx=8, pady=6, sticky="w")
-        self.task_name_entry = ttk.Entry(assign_tasks_frame, width=30)
-        self.task_name_entry.grid(row=0, column=1, padx=20, pady=6, sticky="w")
+        # Single grid block for all 10 rows — labels col0, fields col1, uniform
+        assign_tasks_frame.columnconfigure(0, weight=0, minsize=110)
+        assign_tasks_frame.columnconfigure(1, weight=1)
+        _AFW = 22  # same field width as left form for visual alignment
 
-        # Committee Dropdown
-        ttk.Label(assign_tasks_frame, text="Committee:").grid(row=1, column=0, padx=8, pady=6, sticky="w")
-        self.task_committee_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
-        self.task_committee_combo.grid(row=1, column=1, padx=20, pady=6, sticky="w")
+        ttk.Label(assign_tasks_frame, text="Task Name:").grid(
+            row=0, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.task_name_entry = ttk.Entry(assign_tasks_frame, width=_AFW)
+        self.task_name_entry.grid(row=0, column=1, padx=10, pady=6, sticky="ew")
 
-        # Due Date Input
-        ttk.Label(assign_tasks_frame, text="Due Date (YYYY-MM-DD):").grid(row=2, column=0, padx=8, pady=6, sticky="w")
-        self.task_due_date_entry = ttk.Entry(assign_tasks_frame, width=30)
-        self.task_due_date_entry.grid(row=2, column=1, padx=20, pady=6, sticky="w")
+        ttk.Label(assign_tasks_frame, text="Committee:").grid(
+            row=1, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.task_committee_combo = ModernDropdown(
+            assign_tasks_frame, width=_AFW, state="readonly"
+        )
+        self.task_committee_combo.grid(row=1, column=1, padx=10, pady=6, sticky="ew")
 
-        # Add Task Button
-        add_task_button = ttk.Button(assign_tasks_frame, text="Add Task", style="Add.TButton",
-                                     command=self.add_task)
+        ttk.Label(assign_tasks_frame, text="Due Date (YYYY-MM-DD):").grid(
+            row=2, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.task_due_date_entry = ttk.Entry(assign_tasks_frame, width=_AFW)
+        self.task_due_date_entry.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
+
+        add_task_button = ttk.Button(
+            assign_tasks_frame,
+            text="Add Task",
+            style="Add.TButton",
+            command=self.add_task,
+        )
         add_task_button.grid(row=3, column=0, columnspan=2, pady=15)
 
-        # Load committees for the dropdown
+        self.task_committee_combo.bind(
+            "<<ComboboxSelected>>", self._clear_combo_highlight
+        )
         self._load_committees_for_task()
 
-        # Assign Task Section (below Add Task)
-        ttk.Label(assign_tasks_frame, text="--- Assign Task to Member ---", font=("Segoe UI", 9, "italic")).grid(row=4, column=0, columnspan=2, pady=(10, 5))
+        ttk.Label(
+            assign_tasks_frame,
+            text="--- Assign Task to Member ---",
+            font=("Segoe UI", 9, "italic"),
+        ).grid(row=4, column=0, columnspan=2, pady=(10, 5))
 
-        # Task Selection for Assignment
-        ttk.Label(assign_tasks_frame, text="Task:").grid(row=5, column=0, padx=8, pady=6, sticky="w")
-        self.assign_task_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
-        self.assign_task_combo.grid(row=5, column=1, padx=20, pady=6, sticky="w")
+        ttk.Label(assign_tasks_frame, text="Task:").grid(
+            row=5, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.assign_task_combo = ModernDropdown(
+            assign_tasks_frame, width=_AFW, state="readonly"
+        )
+        self.assign_task_combo.grid(row=5, column=1, padx=10, pady=6, sticky="ew")
 
-        # Member Selection for Assignment
-        ttk.Label(assign_tasks_frame, text="Member:").grid(row=6, column=0, padx=8, pady=6, sticky="w")
-        self.assign_member_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
-        self.assign_member_combo.grid(row=6, column=1, padx=20, pady=6, sticky="w")
+        ttk.Label(assign_tasks_frame, text="Member:").grid(
+            row=6, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.assign_member_combo = ModernDropdown(
+            assign_tasks_frame, width=_AFW, state="readonly"
+        )
+        self.assign_member_combo.grid(row=6, column=1, padx=10, pady=6, sticky="ew")
 
-        # Date Assigned Input
-        ttk.Label(assign_tasks_frame, text="Date Assigned (YYYY-MM-DD):").grid(row=7, column=0, padx=8, pady=6, sticky="w")
-        self.assign_date_entry = ttk.Entry(assign_tasks_frame, width=30)
-        self.assign_date_entry.grid(row=7, column=1, padx=20, pady=6, sticky="w")
+        ttk.Label(assign_tasks_frame, text="Date Assigned (YYYY-MM-DD):").grid(
+            row=7, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.assign_date_entry = ttk.Entry(assign_tasks_frame, width=_AFW)
+        self.assign_date_entry.grid(row=7, column=1, padx=10, pady=6, sticky="ew")
 
-        # Status Dropdown
-        ttk.Label(assign_tasks_frame, text="Status:").grid(row=8, column=0, padx=8, pady=6, sticky="w")
-        self.assign_status_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
-        self.assign_status_combo.grid(row=8, column=1, padx=20, pady=6, sticky="w")
-        # Default status values - these should match the ENUM values in your database
-        self.assign_status_combo['values'] = ['Pending', 'In Progress', 'Completed', 'Cancelled']
-        if self.assign_status_combo['values']:
+        ttk.Label(assign_tasks_frame, text="Status:").grid(
+            row=8, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.assign_status_combo = ModernDropdown(
+            assign_tasks_frame, width=_AFW, state="readonly"
+        )
+        self.assign_status_combo.grid(row=8, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_status_combo["values"] = [
+            "Pending",
+            "In Progress",
+            "Completed",
+            "Cancelled",
+        ]
+        if self.assign_status_combo["values"]:
             self.assign_status_combo.current(0)
 
-        # Assign Task Button
-        assign_task_button = ttk.Button(assign_tasks_frame, text="Assign Task", style="Add.TButton",
-                                        command=self.assign_task)
+        assign_task_button = ttk.Button(
+            assign_tasks_frame,
+            text="Assign Task",
+            style="Add.TButton",
+            command=self.assign_task,
+        )
         assign_task_button.grid(row=9, column=0, columnspan=2, pady=15)
 
-        # Load initial data for assignment dropdowns
+        self.assign_task_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
+        self.assign_member_combo.bind(
+            "<<ComboboxSelected>>", self._clear_combo_highlight
+        )
+        self.assign_status_combo.bind(
+            "<<ComboboxSelected>>", self._clear_combo_highlight
+        )
         self._load_tasks_for_assignment()
         self._load_members_for_assignment()
 
@@ -396,14 +1007,20 @@ class AshscomGUI:
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
         # Placeholder label
-        ttk.Label(task_management_frame, text="Placeholder").pack(expand=True, padx=20, pady=20)
+        ttk.Label(task_management_frame, text="Placeholder").pack(
+            expand=True, padx=20, pady=20
+        )
 
         # --- Assignment Management section (bottom) ---
-        assignment_management_frame = ttk.LabelFrame(container, text="Assignment Management")
+        assignment_management_frame = ttk.LabelFrame(
+            container, text="Assignment Management"
+        )
         assignment_management_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
 
         # Placeholder label
-        ttk.Label(assignment_management_frame, text="Placeholder").pack(expand=True, padx=20, pady=20)
+        ttk.Label(assignment_management_frame, text="Placeholder").pack(
+            expand=True, padx=20, pady=20
+        )
 
     def load_students(self):
         try:
@@ -420,8 +1037,15 @@ class AshscomGUI:
 
             self._all_students_rows = [row[:7] for row in rows]
             self._members_rows = [row[:7] for row in rows if row[7] is not None]
-            self._candidates_rows = [row[:7] for row in rows if row[6] == "Election Candidate"]
-            self._heads_rows = [row[:7] for row in rows if row[6] in ("Committee Head Commissioner", "Asst. Committee Head Commissioner")]
+            self._candidates_rows = [
+                row[:7] for row in rows if row[6] == "Election Candidate"
+            ]
+            self._heads_rows = [
+                row[:7]
+                for row in rows
+                if row[6]
+                in ("Committee Head Commissioner", "Asst. Committee Head Commissioner")
+            ]
 
             self.refresh_table_view()
         except Error as e:
@@ -456,7 +1080,7 @@ class AshscomGUI:
             messagebox.showerror("Database Error", f"Failed to load committees: {e}")
         return [name for (_id, name) in self.committees_list]
 
-# Student management methods
+    # Student management methods
     def add_student(self):
         name = self.name_entry.get().strip()
         grade = self.grade_entry.get().strip()
@@ -478,20 +1102,36 @@ class AshscomGUI:
             messagebox.showwarning("Input Error", "Email is required.")
             return
         if not committee_name and not role:
-            messagebox.showwarning("Input Error", "Please select a role for the Student. If the Student is an Election Candidate, please select the Committee and Role accordingly.")
+            messagebox.showwarning(
+                "Input Error",
+                "Please select a role for the Student. If the Student is an Election Candidate, please select the Committee and Role accordingly.",
+            )
             return
 
         try:
             cursor = self.connection.cursor()
-            cursor.execute("INSERT INTO Student (StudentName, GradeLevel, Section, AdduEmail) VALUES (%s, %s, %s, %s)",
-                           (name, grade, section, email))
+            cursor.execute(
+                "INSERT INTO Student (StudentName, GradeLevel, Section, AdduEmail) VALUES (%s, %s, %s, %s)",
+                (name, grade, section, email),
+            )
             new_student_id = cursor.lastrowid
 
             if committee_name or role:
-                committee_id = next((cid for cid, cname in self.committees_list if cname == committee_name), None) if committee_name else None
+                committee_id = (
+                    next(
+                        (
+                            cid
+                            for cid, cname in self.committees_list
+                            if cname == committee_name
+                        ),
+                        None,
+                    )
+                    if committee_name
+                    else None
+                )
                 cursor.execute(
                     "INSERT INTO Member (StudentID, CommitteeID, OfficerRole) VALUES (%s, %s, %s)",
-                    (new_student_id, committee_id, role if role else "Member")
+                    (new_student_id, committee_id, role if role else "Member"),
                 )
 
             self.connection.commit()
@@ -504,16 +1144,18 @@ class AshscomGUI:
 
     def clear_add_form(self):
         self.name_entry.delete(0, tk.END)
-        self.grade_entry.delete(0, tk.END)
-        self.section_entry.delete(0, tk.END)
+        self.grade_entry.set("")
+        self.section_entry.set("")
+        self.section_entry["values"] = []
         self.email_entry.delete(0, tk.END)
         self.committee_combo.set("")
         self.role_combo.set("")
 
     def clear_edit_form(self):
         self.edit_name_entry.delete(0, tk.END)
-        self.edit_grade_entry.delete(0, tk.END)
-        self.edit_section_entry.delete(0, tk.END)
+        self.edit_grade_entry.set("")
+        self.edit_section_entry.set("")
+        self.edit_section_entry["values"] = []
         self.edit_email_entry.delete(0, tk.END)
         self.edit_committee_combo.set("")
         self.edit_role_combo.set("")
@@ -521,14 +1163,14 @@ class AshscomGUI:
     def on_student_select(self, tree):
         selected = tree.focus()
         if selected:
-            values = tree.item(selected, 'values')
+            values = tree.item(selected, "values")
             if values:
                 self.edit_name_entry.delete(0, tk.END)
                 self.edit_name_entry.insert(0, values[1])
-                self.edit_grade_entry.delete(0, tk.END)
-                self.edit_grade_entry.insert(0, values[2])
-                self.edit_section_entry.delete(0, tk.END)
-                self.edit_section_entry.insert(0, values[3])
+                grade_value = values[2] if values[2] else ""
+                self.edit_grade_entry.set(grade_value)
+                self.edit_section_entry["values"] = GRADE_SECTIONS.get(grade_value, [])
+                self.edit_section_entry.set(values[3] if values[3] else "")
                 self.edit_email_entry.delete(0, tk.END)
                 self.edit_email_entry.insert(0, values[4])
                 self.edit_committee_combo.set(values[5] if values[5] else "")
@@ -542,8 +1184,10 @@ class AshscomGUI:
             self.delete_btn.config(state="disabled")
 
     def update_student(self):
-        if not hasattr(self, '_selected_student_id') or not self._selected_student_id:
-            messagebox.showwarning("Selection Error", "Please select a Student to update.")
+        if not hasattr(self, "_selected_student_id") or not self._selected_student_id:
+            messagebox.showwarning(
+                "Selection Error", "Please select a Student to update."
+            )
             return
         student_id = self._selected_student_id
         name = self.edit_name_entry.get().strip()
@@ -568,15 +1212,37 @@ class AshscomGUI:
 
         try:
             cursor = self.connection.cursor()
-            cursor.execute("UPDATE Student SET StudentName=%s, GradeLevel=%s, Section=%s, AdduEmail=%s WHERE StudentID=%s",
-                           (name, grade, section, email, student_id))
+            cursor.execute(
+                "UPDATE Student SET StudentName=%s, GradeLevel=%s, Section=%s, AdduEmail=%s WHERE StudentID=%s",
+                (name, grade, section, email, student_id),
+            )
 
             if committee_name or role:
-                committee_id = next((cid for cid, cname in self.committees_list if cname == committee_name), None) if committee_name else None
-                cursor.execute("""
+                committee_id = (
+                    next(
+                        (
+                            cid
+                            for cid, cname in self.committees_list
+                            if cname == committee_name
+                        ),
+                        None,
+                    )
+                    if committee_name
+                    else None
+                )
+                cursor.execute(
+                    """
                     INSERT INTO Member (StudentID, CommitteeID, OfficerRole) VALUES (%s, %s, %s)
                     ON DUPLICATE KEY UPDATE CommitteeID=%s, OfficerRole=%s
-                """, (student_id, committee_id, role if role else "Member", committee_id, role if role else "Member"))
+                """,
+                    (
+                        student_id,
+                        committee_id,
+                        role if role else "Member",
+                        committee_id,
+                        role if role else "Member",
+                    ),
+                )
 
             self.connection.commit()
             cursor.close()
@@ -587,17 +1253,24 @@ class AshscomGUI:
             messagebox.showerror("Database Error", f"Failed to update student: {e}")
 
     def delete_student(self):
-        if not hasattr(self, '_selected_student_id') or not self._selected_student_id:
-            messagebox.showwarning("Selection Error", "Please select a Student to delete.")
+        if not hasattr(self, "_selected_student_id") or not self._selected_student_id:
+            messagebox.showwarning(
+                "Selection Error", "Please select a Student to delete."
+            )
             return
         student_id = self._selected_student_id
-        if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete this Student #{student_id}?"):
+        if messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete this Student #{student_id}?",
+        ):
             try:
                 cursor = self.connection.cursor()
                 cursor.execute("DELETE FROM Student WHERE StudentID=%s", (student_id,))
                 self.connection.commit()
                 cursor.close()
-                messagebox.showinfo("Success", f"Student {student_id} deleted successfully.")
+                messagebox.showinfo(
+                    "Success", f"Student {student_id} deleted successfully."
+                )
                 self.clear_edit_form()
                 self.load_students()
             except Error as e:
@@ -608,12 +1281,14 @@ class AshscomGUI:
         try:
             cursor = self.connection.cursor()
             cursor.execute("SELECT CommitteeID, CommitteeName FROM Committee")
-            self.committees_list = cursor.fetchall()  # Store as list of tuples (ID, Name)
+            self.committees_list = (
+                cursor.fetchall()
+            )  # Store as list of tuples (ID, Name)
             cursor.close()
 
             # Populate the combobox with committee names
             committee_names = [name for (_id, name) in self.committees_list]
-            self.task_committee_combo['values'] = committee_names
+            self.task_committee_combo["values"] = committee_names
             if committee_names:
                 self.task_committee_combo.current(0)
         except Error as e:
@@ -640,8 +1315,11 @@ class AshscomGUI:
 
         # Validate date format (basic validation)
         import re
-        if not re.match(r'^\d{4}-\d{2}-\d{2}$', due_date):
-            messagebox.showwarning("Input Error", "Due date must be in YYYY-MM-DD format.")
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", due_date):
+            messagebox.showwarning(
+                "Input Error", "Due date must be in YYYY-MM-DD format."
+            )
             return
 
         # Get CommitteeID from the selection
@@ -657,10 +1335,13 @@ class AshscomGUI:
 
         try:
             cursor = self.connection.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO Task (TaskName, CommitteeID, DueDate)
                 VALUES (%s, %s, %s)
-            """, (task_name, committee_id, due_date))
+            """,
+                (task_name, committee_id, due_date),
+            )
 
             self.connection.commit()
             cursor.close()
@@ -669,7 +1350,7 @@ class AshscomGUI:
 
             # Clear the form
             self.task_name_entry.delete(0, tk.END)
-            self.task_committee_combo.set('')
+            self.task_committee_combo.set("")
             self.task_due_date_entry.delete(0, tk.END)
 
             # Refresh the committee dropdown in case new committees were added
@@ -688,7 +1369,7 @@ class AshscomGUI:
 
             # Populate the combobox with task names
             task_names = [name for (_id, name) in self.tasks_list]
-            self.assign_task_combo['values'] = task_names
+            self.assign_task_combo["values"] = task_names
             if task_names:
                 self.assign_task_combo.current(0)
         except Error as e:
@@ -708,7 +1389,7 @@ class AshscomGUI:
 
             # Populate the combobox with student names
             member_names = [name for (_id, name) in self.members_list]
-            self.assign_member_combo['values'] = member_names
+            self.assign_member_combo["values"] = member_names
             if member_names:
                 self.assign_member_combo.current(0)
         except Error as e:
@@ -736,8 +1417,11 @@ class AshscomGUI:
 
         # Validate date format (basic validation)
         import re
-        if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_assigned):
-            messagebox.showwarning("Input Error", "Date assigned must be in YYYY-MM-DD format.")
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_assigned):
+            messagebox.showwarning(
+                "Input Error", "Date assigned must be in YYYY-MM-DD format."
+            )
             return
 
         if not status:
@@ -768,10 +1452,13 @@ class AshscomGUI:
 
         try:
             cursor = self.connection.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO Assignment (TaskID, MemberID, DateAssigned, Status)
                 VALUES (%s, %s, %s, %s)
-            """, (task_id, member_id, date_assigned, status))
+            """,
+                (task_id, member_id, date_assigned, status),
+            )
 
             self.connection.commit()
             cursor.close()
@@ -779,10 +1466,10 @@ class AshscomGUI:
             messagebox.showinfo("Success", "Task assigned successfully.")
 
             # Clear the form
-            self.assign_task_combo.set('')
-            self.assign_member_combo.set('')
+            self.assign_task_combo.set("")
+            self.assign_member_combo.set("")
             self.assign_date_entry.delete(0, tk.END)
-            self.assign_status_combo.set('')
+            self.assign_status_combo.set("")
 
             # Refresh dropdowns
             self._load_tasks_for_assignment()
@@ -796,4 +1483,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = AshscomGUI(root)
     root.mainloop()
-

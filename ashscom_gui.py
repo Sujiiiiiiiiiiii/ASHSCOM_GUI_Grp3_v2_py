@@ -268,8 +268,16 @@ class AshscomGUI:
         students_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["add_student"] = students_frame
 
-        add_student_frame = ttk.LabelFrame(students_frame, text="Add Student")
-        add_student_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        # Create a container for two sections with some spacing
+        container = ttk.Frame(students_frame)
+        container.pack(fill="both", expand=True, padx=15, pady=15)
+        container.columnconfigure(0, weight=1)
+        container.columnconfigure(1, weight=1)
+        container.rowconfigure(0, weight=1)
+
+        # --- Add Student section (left) ---
+        add_student_frame = ttk.LabelFrame(container, text="Add Student")
+        add_student_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=5)
 
         entry_frame = ttk.Frame(add_student_frame)
         entry_frame.pack(fill="x", padx=10, pady=(10, 5))
@@ -307,6 +315,33 @@ class AshscomGUI:
 
         ttk.Button(button_frame, text="+ Add Student", style="Add.TButton",
                    command=self.add_student).pack(side="left", padx=8, ipadx=0)
+
+        # --- Assign Tasks section (right) - Add Task Functionality ---
+        assign_tasks_frame = ttk.LabelFrame(container, text="Assign Tasks")
+        assign_tasks_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=5)
+
+        # Task Name Input
+        ttk.Label(assign_tasks_frame, text="Task Name:").grid(row=0, column=0, padx=8, pady=6, sticky="w")
+        self.task_name_entry = ttk.Entry(assign_tasks_frame, width=30)
+        self.task_name_entry.grid(row=0, column=1, padx=20, pady=6, sticky="w")
+
+        # Committee Dropdown
+        ttk.Label(assign_tasks_frame, text="Committee:").grid(row=1, column=0, padx=8, pady=6, sticky="w")
+        self.task_committee_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
+        self.task_committee_combo.grid(row=1, column=1, padx=20, pady=6, sticky="w")
+
+        # Due Date Input
+        ttk.Label(assign_tasks_frame, text="Due Date (YYYY-MM-DD):").grid(row=2, column=0, padx=8, pady=6, sticky="w")
+        self.task_due_date_entry = ttk.Entry(assign_tasks_frame, width=30)
+        self.task_due_date_entry.grid(row=2, column=1, padx=20, pady=6, sticky="w")
+
+        # Add Task Button
+        add_task_button = ttk.Button(assign_tasks_frame, text="Add Task", style="Add.TButton",
+                                     command=self.add_task)
+        add_task_button.grid(row=3, column=0, columnspan=2, pady=15)
+
+        # Load committees for the dropdown
+        self._load_committees_for_task()
 
     def create_tasks_assignments_tab(self, parent):
         settings_frame = ttk.Frame(parent)
@@ -513,6 +548,81 @@ class AshscomGUI:
                 self.load_students()
             except Error as e:
                 messagebox.showerror("Database Error", f"Failed to delete student: {e}")
+
+    def _load_committees_for_task(self):
+        """Load committees for the task committee dropdown."""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT CommitteeID, CommitteeName FROM Committee")
+            self.committees_list = cursor.fetchall()  # Store as list of tuples (ID, Name)
+            cursor.close()
+
+            # Populate the combobox with committee names
+            committee_names = [name for (_id, name) in self.committees_list]
+            self.task_committee_combo['values'] = committee_names
+            if committee_names:
+                self.task_committee_combo.current(0)
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to load committees: {e}")
+
+    def add_task(self):
+        """Add a new task to the database."""
+        task_name = self.task_name_entry.get().strip()
+        committee_selection = self.task_committee_combo.get()
+        due_date = self.task_due_date_entry.get().strip()
+
+        # Validation
+        if not task_name:
+            messagebox.showwarning("Input Error", "Task name is required.")
+            return
+
+        if not committee_selection:
+            messagebox.showwarning("Input Error", "Please select a committee.")
+            return
+
+        if not due_date:
+            messagebox.showwarning("Input Error", "Due date is required.")
+            return
+
+        # Validate date format (basic validation)
+        import re
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', due_date):
+            messagebox.showwarning("Input Error", "Due date must be in YYYY-MM-DD format.")
+            return
+
+        # Get CommitteeID from the selection
+        committee_id = None
+        for cid, cname in self.committees_list:
+            if cname == committee_selection:
+                committee_id = cid
+                break
+
+        if committee_id is None:
+            messagebox.showerror("Error", "Could not determine Committee ID.")
+            return
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                INSERT INTO Task (TaskName, CommitteeID, DueDate)
+                VALUES (%s, %s, %s)
+            """, (task_name, committee_id, due_date))
+
+            self.connection.commit()
+            cursor.close()
+
+            messagebox.showinfo("Success", "Task added successfully.")
+
+            # Clear the form
+            self.task_name_entry.delete(0, tk.END)
+            self.task_committee_combo.set('')
+            self.task_due_date_entry.delete(0, tk.END)
+
+            # Refresh the committee dropdown in case new committees were added
+            self._load_committees_for_task()
+
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to add task: {e}")
 
 
 if __name__ == "__main__":

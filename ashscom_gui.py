@@ -120,7 +120,7 @@ class AshscomGUI:
             self.nav_buttons[name].config(bg="#7ED985", fg="#000000")
             self.nav_accents[name].config(bg="#004202")
 
-        nav_buttons = [("👥  Students", "students"), ("➕  Add Student", "add_student"), ("📋  Tasks/Assignments", "task/assignment")]
+        nav_buttons = [("👥  Students", "students"), ("➕  Add Student/Tasks", "add_student"), ("📋  Tasks/Assignments", "task/assignment")]
         for label, key in nav_buttons:
             row = tk.Frame(sidebar, bg="#004202")
             row.pack(fill="x", pady=(4, 0))
@@ -169,7 +169,7 @@ class AshscomGUI:
 
         # --- LEFT: Edit form ---
         form_frame = ttk.LabelFrame(overview_frame, text="Update Student")
-        form_frame.grid(row=0, column=0, sticky="new", padx=(10, 5), pady=10)
+        form_frame.grid(row=0, column=0, sticky="new", padx=(10, 5), pady=(10, 11))
 
         ttk.Label(form_frame, text="Student Name:").pack(anchor="w", padx=10, pady=(10, 2))
         self.edit_name_entry = ttk.Entry(form_frame, width=25)

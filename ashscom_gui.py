@@ -5,6 +5,7 @@ from PIL import Image, ImageTk
 from db_connect import create_connection
 from mysql.connector import Error
 
+
 # ---------------------------------------------------------------------------
 # Grade Level -> Sections map (alphabetical)
 # ---------------------------------------------------------------------------
@@ -98,12 +99,12 @@ GRADE_LEVELS = list(GRADE_SECTIONS.keys())
 
 
 class ModernDropdown(tk.Frame):
-    BORDER = "#7ED985"
-    BORDER_ACTIVE = "#004202"
-    TEXT = "#0F1A0F"
-    PLACEHOLDER = "#44A04C"
-    HOVER = "#B7ECBD"
-    SELECTED = "#6DB876"
+    BORDER = "#003366"          # AdDU Navy Blue
+    BORDER_ACTIVE = "#198754"   # Professional Green for focus
+    TEXT = "#1A1A1A"            
+    PLACEHOLDER = "#6C757D"     
+    HOVER = "#E8F5E9"           # Very soft light green
+    SELECTED = "#C8E6C9"        # Solid light green
     ROW_HEIGHT = 28
     MAX_VISIBLE_ROWS = 8
 
@@ -338,7 +339,7 @@ class AshscomGUI:
     def setup_styles(self):
         style = ttk.Style()
         style.theme_use("clam")
-
+        
         # Clean white/soft background instead of default gray
         style.configure("TFrame", background="#F7FFF9")
         style.configure("TLabelframe", background="#F7FFF9", bordercolor="#7ED985")
@@ -360,6 +361,7 @@ class AshscomGUI:
             lightcolor=[("focus", "#004202")],
             darkcolor=[("focus", "#004202")],
         )
+
 
         style.configure(
             "Add.TButton",

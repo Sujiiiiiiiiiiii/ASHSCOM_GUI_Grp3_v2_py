@@ -325,6 +325,8 @@ class ModernDropdown(tk.Frame):
 
 
 class AshscomGUI:
+    STUDENT_PASSKEY = "ashscom2026"
+
     def __init__(self, root):
         self.root = root
         self.root.title("Ashscom Management System")
@@ -372,10 +374,10 @@ class AshscomGUI:
             "Update.TButton",
             font=("Segoe UI", 10, "bold"),
             padding=8,
-            background="#FFD966",
-            foreground="#5C4400",
+            background="#7ED985",
+            foreground="#017103",
         )
-        style.map("Update.TButton", background=[("active", "#E6C25C")])
+        style.map("Update.TButton", background=[("active", "#5FC46B")])
 
         style.configure(
             "Delete.TButton",
@@ -387,7 +389,7 @@ class AshscomGUI:
         style.map(
             "Delete.TButton",
             background=[("active", "#D96666"), ("disabled", "#F2A6A6")],
-            foreground=[("disabled", "#8B3A3A")],
+            foreground=[("disabled", "#959292")],
         )
 
         style.configure(
@@ -684,7 +686,7 @@ class AshscomGUI:
 
         self.update_btn = ttk.Button(
             form_frame,
-            text="Update Selected",
+            text="🔼 Update Selected",
             style="Update.TButton",
             command=self.update_student,
             state="disabled",
@@ -695,21 +697,40 @@ class AshscomGUI:
 
         self.delete_btn = ttk.Button(
             form_frame,
-            text="Delete Selected",
+            text="🗑 Delete Selected",
             style="Delete.TButton",
             command=self.delete_student,
             state="disabled",
         )
         self.delete_btn.grid(
-            row=7, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="ew"
+            row=7, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew"
         )
 
         # --- RIGHT: View switcher + single table ---
         right_col = ttk.Frame(overview_frame)
         right_col.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
+        right_col.rowconfigure(0, weight=1)
+        right_col.columnconfigure(0, weight=1)
 
-        view_row = ttk.Frame(right_col)
-        view_row.pack(fill="x", pady=(10, 8))
+        # Lock screen - shown by default
+        self.lock_frame = ttk.Frame(right_col)
+        self.lock_frame.grid(row=0, column=0, sticky="nsew")
+
+        lock_inner = ttk.Frame(self.lock_frame)
+        lock_inner.place(relx=0.5, rely=0.4, anchor="center")
+        ttk.Label(lock_inner, text="🔒", font=("Segoe UI", 40)).pack(pady=(0, 10))
+        ttk.Label(lock_inner, text="Student records are protected.",
+                  font=("Segoe UI", 11, "bold")).pack(pady=(0, 15))
+        ttk.Button(lock_inner, text="🔍 View Students", style="Add.TButton",
+                   command=self._prompt_unlock).pack()
+
+        # Data screen - hidden until unlocked
+        self.data_frame = ttk.Frame(right_col)
+        self.data_frame.grid(row=0, column=0, sticky="nsew")
+
+        view_row = ttk.Frame(self.data_frame)
+        view_row.pack(fill="x", padx=8, pady=(10, 8))
+
         ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(
             side="left", padx=(0, 5)
         )
@@ -725,18 +746,34 @@ class AshscomGUI:
             ],
         )
         self.view_combo.set("All Students")
-        self.view_combo.pack(side="left")
+        self.view_combo.pack(side="left", padx=(0, 12))
         self.view_combo.bind(
             "<<ComboboxSelected>>",
             lambda e: (self.refresh_table_view(), self._clear_combo_highlight(e)),
         )
 
-        self.student_tree = self._build_tree(right_col)
+        search_wrap = tk.Frame(view_row, bg="#7ED985", bd=0)
+        search_wrap.pack(side="left", fill="x", expand=True)
+
+        search_inner = tk.Frame(search_wrap, bg="white")
+        search_inner.pack(fill="both", expand=True, padx=1, pady=1)
+
+        tk.Label(search_inner, text="🔍", bg="white", fg="#6B6B6B",
+                 font=("Segoe UI", 10)).pack(side="left", padx=(10, 4), pady=6)
+
+        self.search_var = tk.StringVar()
+        search_entry = tk.Entry(search_inner, textvariable=self.search_var,
+                                 bg="white", fg="#0F1A0F", relief="flat",
+                                 font=("Segoe UI", 10), bd=0)
+        search_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
+        self.search_var.trace_add("write", lambda *args: self.refresh_table_view())
+
+        self.student_tree = self._build_tree(self.data_frame)
         self.student_tree.bind(
             "<<TreeviewSelect>>", lambda e: self.on_student_select(self.student_tree)
         )
 
-        self.load_students()
+        self.lock_frame.tkraise()
 
     def _build_tree(self, parent):
         tree_frame = ttk.Frame(parent)
@@ -1065,6 +1102,13 @@ class AshscomGUI:
         else:
             data = self._all_students_rows
 
+        query = self.search_var.get().strip().lower() if hasattr(self, "search_var") else ""
+        if query:
+            data = [
+                row for row in data
+                if any(query in str(field).lower() for field in row if field is not None)
+            ]
+
         for i, row in enumerate(data):
             tag = "evenrow" if i % 2 == 0 else "oddrow"
             self.student_tree.insert("", tk.END, values=row, tags=(tag,))
@@ -1159,6 +1203,70 @@ class AshscomGUI:
         self.edit_email_entry.delete(0, tk.END)
         self.edit_committee_combo.set("")
         self.edit_role_combo.set("")
+
+    def _prompt_unlock(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Enter Passkey")
+        dialog.configure(bg="#F7FFF9")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        dialog.update_idletasks()
+        w, h = 320, 180
+        x = (dialog.winfo_screenwidth() // 2) - (w // 2)
+        y = (dialog.winfo_screenheight() // 2) - (h // 2)
+        dialog.geometry(f"{w}x{h}+{x}+{y}")
+        content = tk.Frame(dialog, bg="#F7FFF9")
+        content.pack(fill="both", expand=True, padx=20, pady=15)
+
+        ttk.Label(content, text="Enter passkey to view student records:",
+                  font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 8))
+
+        entry_var = tk.StringVar()
+        entry = ttk.Entry(content, textvariable=entry_var, width=3, show="*")
+        entry.pack(fill="x", pady=(0, 8))
+        entry.focus_set()
+
+        show_var = tk.BooleanVar(value=False)
+
+        def toggle_show():
+            entry.config(show="" if show_var.get() else "*")
+
+        tk.Checkbutton(content, text="Show passkey", variable=show_var,
+                       command=toggle_show, bg="#F7FFF9", fg="#0F1A0F",
+                       activebackground="#F7FFF9", font=("Segoe UI", 9),
+                       selectcolor="white").pack(anchor="w", pady=(0, 15))
+
+        result = {"value": None}
+
+        def confirm():
+            result["value"] = entry_var.get()
+            dialog.destroy()
+
+        def cancel():
+            dialog.destroy()
+
+        btn_row = tk.Frame(content, bg="#F7FFF9")
+        btn_row.pack(anchor="w")
+        ttk.Button(btn_row, text="Confirm", style="Add.TButton", command=confirm, width=10).pack(
+            side="left", padx=(0, 8)
+        )
+        ttk.Button(btn_row, text="Cancel", style="Update.TButton", command=cancel, width=10).pack(
+            side="left"
+        )
+
+        entry.bind("<Return>", lambda e: confirm())
+        dialog.wait_window()
+
+        entered = result["value"]
+        if entered is None:
+            return
+        if entered == self.STUDENT_PASSKEY:
+            self.data_frame.tkraise()
+            self.load_students()
+        else:
+            messagebox.showerror("Access Denied", "Incorrect passkey.")
 
     def on_student_select(self, tree):
         selected = tree.focus()

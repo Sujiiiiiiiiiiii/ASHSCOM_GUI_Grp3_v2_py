@@ -99,7 +99,7 @@ GRADE_LEVELS = list(GRADE_SECTIONS.keys())
 
 class ModernDropdown(tk.Frame):
     BORDER = "#7ED985"
-    BORDER_ACTIVE = "#7ED985"
+    BORDER_ACTIVE = "#004202"
     TEXT = "#0F1A0F"
     PLACEHOLDER = "#44A04C"
     HOVER = "#B7ECBD"

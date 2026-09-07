@@ -340,80 +340,84 @@ class AshscomGUI:
         style = ttk.Style()
         style.theme_use("clam")
         
-        # Clean white/soft background instead of default gray
-        style.configure("TFrame", background="#F7FFF9")
-        style.configure("TLabelframe", background="#F7FFF9", bordercolor="#7ED985")
-        style.configure("TLabel", background="#F7FFF9", font=("Segoe UI", 10))
-        style.configure("TNotebook", background="#F7FFF9")
-        style.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=[12, 6])
-
+        BG_COLOR = "#F4F6F9"
+        ADDU_BLUE = "#003366"
+        ADDU_GOLD = "#D4AF37"
+        ACTION_GREEN = "#198754" 
+        
+        style.configure("TFrame", background=BG_COLOR)
+        style.configure("TLabelframe", background=BG_COLOR, bordercolor=ADDU_BLUE)
+        style.configure("TLabel", background=BG_COLOR, font=("Segoe UI", 10))
+        
         style.configure(
             "TLabelframe.Label",
-            font=("Segoe UI", 12, "bold"),
-            foreground="#004202",
-            background="#F7FFF9",
+            font=("Segoe UI", 11, "bold"),
+            foreground=ADDU_BLUE,
+            background=BG_COLOR,
         )
-        style.configure("TLabel", font=("Segoe UI", 10))
-        style.configure("TEntry", padding=6, relief="flat", bordercolor="#7ED985")
+        
+        # Entry Fields - Blue resting, Green focus
+        style.configure("TEntry", padding=6, relief="flat", bordercolor="#B0C4DE")
         style.map(
             "TEntry",
-            bordercolor=[("focus", "#004202")],
-            lightcolor=[("focus", "#004202")],
-            darkcolor=[("focus", "#004202")],
+            bordercolor=[("focus", ACTION_GREEN)],
+            lightcolor=[("focus", ACTION_GREEN)],
+            darkcolor=[("focus", ACTION_GREEN)],
         )
-
-
+        
+        # Action Buttons
         style.configure(
             "Add.TButton",
             font=("Segoe UI", 10, "bold"),
             padding=8,
-            background="#7ED985",
-            foreground="#004202",
+            background=ACTION_GREEN,
+            foreground="white",
         )
-        style.map("Add.TButton", background=[("active", "#5FC46B")])
-
+        style.map("Add.TButton", background=[("active", "#157347")])
+        
         style.configure(
             "Update.TButton",
             font=("Segoe UI", 10, "bold"),
             padding=8,
-            background="#7ED985",
-            foreground="#017103",
+            background=ADDU_GOLD,
+            foreground="#00205B", 
         )
-        style.map("Update.TButton", background=[("active", "#5FC46B")])
-
+        style.map("Update.TButton", background=[("active", "#F2C230")])
+        
         style.configure(
             "Delete.TButton",
             font=("Segoe UI", 10, "bold"),
             padding=8,
-            background="#F27C7C",
-            foreground="#5C0000",
+            background="#D9534F", 
+            foreground="white",
         )
         style.map(
             "Delete.TButton",
-            background=[("active", "#D96666"), ("disabled", "#F2A6A6")],
-            foreground=[("disabled", "#959292")],
+            background=[("active", "#C9302C"), ("disabled", "#F2A6A6")],
+            foreground=[("disabled", "#F4F6F9")],
         )
-
+        
+        # Treeview
         style.configure(
             "Treeview",
             font=("Segoe UI", 10),
-            rowheight=28,
+            rowheight=32, 
             background="white",
             fieldbackground="white",
-            foreground="#0F1A0F",
+            foreground="#1A1A1A",
         )
         style.map(
             "Treeview",
-            background=[("selected", "#D4FFD9")],
-            foreground=[("selected", "#004202")],
+            background=[("selected", "#E8F5E9")], # Light green selection
+            foreground=[("selected", ACTION_GREEN)],
         )
         style.configure(
             "Treeview.Heading",
             font=("Segoe UI", 10, "bold"),
-            background="#7ED985",
-            foreground="#004202",
+            background=ADDU_BLUE,
+            foreground="white",
         )
-        style.map("Treeview.Heading", background=[("active", "#7ED985")])
+        style.map("Treeview.Heading", background=[("active", "#00205B")])
         self.root.option_add("*TEntry*selectBackground", "#D4FFD9")
         self.root.option_add("*TEntry*selectForeground", "#004202")
         self.root.option_add("*Entry.selectBackground", "#D4FFD9")
@@ -434,8 +438,9 @@ class AshscomGUI:
             header_canvas.delete("all")  # clear everything and redraw fresh
 
             # Gradient
-            r1, g1, b1 = self.root.winfo_rgb("#D4FFD9")
-            r2, g2, b2 = self.root.winfo_rgb("#7ED985")
+            r1, g1, b1 = self.root.winfo_rgb("#00153B") 
+            r2, g2, b2 = self.root.winfo_rgb("#003366")
+            
             for i in range(height):
                 nr = int(r1 + (r2 - r1) * i / height) >> 8
                 ng = int(g1 + (g2 - g1) * i / height) >> 8
@@ -454,7 +459,7 @@ class AshscomGUI:
                 28,
                 text="Ateneo De Davao University Senior High School",
                 font=("Segoe UI", 12, "bold"),
-                fill="#017103",
+                fill="#F4F6F9",
                 anchor="e",
             )
             header_canvas.create_text(
@@ -462,7 +467,7 @@ class AshscomGUI:
                 48,
                 text="Commission on Elections",
                 font=("Segoe UI", 12, "bold"),
-                fill="#017103",
+                fill="#F4F6F9",
                 anchor="e",
             )
             header_canvas.create_text(
@@ -470,13 +475,13 @@ class AshscomGUI:
                 75,
                 text="ASHSCOM MANAGEMENT SYSTEM",
                 font=("Segoe UI", 23, "bold"),
-                fill="#005901",
+                fill="#D4AF37",
                 anchor="e",
             )
 
         header_canvas.bind("<Configure>", redraw_header)
 
-        divider = tk.Frame(self.root, bg="#7ED985", height=3)
+        divider = tk.Frame(self.root, bg="#198754", height=3)
         divider.pack(fill="x")
 
         # Create a connection to the database
@@ -490,7 +495,7 @@ class AshscomGUI:
         body_frame = ttk.Frame(self.root)
         body_frame.pack(expand=True, fill="both")
 
-        sidebar = tk.Frame(body_frame, bg="#7ED985", width=230)
+        sidebar = tk.Frame(body_frame, bg="#00205B", width=230)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
@@ -509,10 +514,10 @@ class AshscomGUI:
             self.pages[name].tkraise()
             self.nav_buttons_active = name
             for key, b in self.nav_buttons.items():
-                b.config(bg="#004202", fg="white")
-                self.nav_accents[key].config(bg="#7ED985")
-            self.nav_buttons[name].config(bg="#7ED985", fg="#000000")
-            self.nav_accents[name].config(bg="#004202")
+                b.config(bg="#00205B", fg="white")
+                self.nav_accents[key].config(bg="#00205B")
+            self.nav_buttons[name].config(bg="#003366", fg="#28A745")
+            self.nav_accents[name].config(bg="#28A745")
 
         nav_buttons = [
             ("👥  Students", "students"),
@@ -520,10 +525,10 @@ class AshscomGUI:
             ("📋  Tasks/Assignments", "task/assignment"),
         ]
         for label, key in nav_buttons:
-            row = tk.Frame(sidebar, bg="#004202")
+            row = tk.Frame(sidebar, bg="#00205B")
             row.pack(fill="x", pady=(4, 0))
 
-            accent = tk.Frame(row, bg="#004202", width=5)
+            accent = tk.Frame(row, bg="#00205B", width=5)
             accent.pack(side="left", fill="y")
             self.nav_accents[key] = accent
 
@@ -531,10 +536,10 @@ class AshscomGUI:
                 row,
                 text=label,
                 font=("Segoe UI", 11, "bold"),
-                bg="#004202",
+                bg="#00205B",
                 fg="white",
-                activebackground="#0A5C13",
-                activeforeground="#7ED985",
+                activebackground="#003366",
+                activeforeground="#28A745",
                 bd=0,
                 relief="flat",
                 anchor="w",
@@ -548,11 +553,11 @@ class AshscomGUI:
 
             def on_enter(e, k=key):
                 if self.nav_buttons_active != k:
-                    self.nav_buttons[k].config(bg="#0A5C13")
+                    self.nav_buttons[k].config(bg="#003366")
 
             def on_leave(e, k=key):
                 if self.nav_buttons_active != k:
-                    self.nav_buttons[k].config(bg="#004202")
+                    self.nav_buttons[k].config(bg="#00205B")
 
             btn.bind("<Enter>", on_enter)
             btn.bind("<Leave>", on_leave)

@@ -343,6 +343,42 @@ class AshscomGUI:
         # Load committees for the dropdown
         self._load_committees_for_task()
 
+        # Assign Task Section (below Add Task)
+        ttk.Label(assign_tasks_frame, text="--- Assign Task to Member ---", font=("Segoe UI", 9, "italic")).grid(row=4, column=0, columnspan=2, pady=(10, 5))
+
+        # Task Selection for Assignment
+        ttk.Label(assign_tasks_frame, text="Task:").grid(row=5, column=0, padx=8, pady=6, sticky="w")
+        self.assign_task_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
+        self.assign_task_combo.grid(row=5, column=1, padx=20, pady=6, sticky="w")
+
+        # Member Selection for Assignment
+        ttk.Label(assign_tasks_frame, text="Member:").grid(row=6, column=0, padx=8, pady=6, sticky="w")
+        self.assign_member_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
+        self.assign_member_combo.grid(row=6, column=1, padx=20, pady=6, sticky="w")
+
+        # Date Assigned Input
+        ttk.Label(assign_tasks_frame, text="Date Assigned (YYYY-MM-DD):").grid(row=7, column=0, padx=8, pady=6, sticky="w")
+        self.assign_date_entry = ttk.Entry(assign_tasks_frame, width=30)
+        self.assign_date_entry.grid(row=7, column=1, padx=20, pady=6, sticky="w")
+
+        # Status Dropdown
+        ttk.Label(assign_tasks_frame, text="Status:").grid(row=8, column=0, padx=8, pady=6, sticky="w")
+        self.assign_status_combo = ttk.Combobox(assign_tasks_frame, width=27, state="readonly")
+        self.assign_status_combo.grid(row=8, column=1, padx=20, pady=6, sticky="w")
+        # Default status values - these should match the ENUM values in your database
+        self.assign_status_combo['values'] = ['Pending', 'In Progress', 'Completed', 'Cancelled']
+        if self.assign_status_combo['values']:
+            self.assign_status_combo.current(0)
+
+        # Assign Task Button
+        assign_task_button = ttk.Button(assign_tasks_frame, text="Assign Task", style="Add.TButton",
+                                        command=self.assign_task)
+        assign_task_button.grid(row=9, column=0, columnspan=2, pady=15)
+
+        # Load initial data for assignment dropdowns
+        self._load_tasks_for_assignment()
+        self._load_members_for_assignment()
+
     def create_tasks_assignments_tab(self, parent):
         settings_frame = ttk.Frame(parent)
         settings_frame.grid(row=0, column=0, sticky="nsew")
@@ -623,6 +659,119 @@ class AshscomGUI:
 
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to add task: {e}")
+
+    def _load_tasks_for_assignment(self):
+        """Load tasks for the assignment task dropdown."""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT TaskID, TaskName FROM Task")
+            self.tasks_list = cursor.fetchall()  # Store as list of tuples (ID, Name)
+            cursor.close()
+
+            # Populate the combobox with task names
+            task_names = [name for (_id, name) in self.tasks_list]
+            self.assign_task_combo['values'] = task_names
+            if task_names:
+                self.assign_task_combo.current(0)
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to load tasks: {e}")
+
+    def _load_members_for_assignment(self):
+        """Load members for the assignment member dropdown."""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT m.MemberID, s.StudentName
+                FROM Member m
+                JOIN Student s ON m.StudentID = s.StudentID
+            """)
+            self.members_list = cursor.fetchall()  # Store as list of tuples (ID, Name)
+            cursor.close()
+
+            # Populate the combobox with student names
+            member_names = [name for (_id, name) in self.members_list]
+            self.assign_member_combo['values'] = member_names
+            if member_names:
+                self.assign_member_combo.current(0)
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to load members: {e}")
+
+    def assign_task(self):
+        """Assign a task to a member."""
+        task_selection = self.assign_task_combo.get()
+        member_selection = self.assign_member_combo.get()
+        date_assigned = self.assign_date_entry.get().strip()
+        status = self.assign_status_combo.get()
+
+        # Validation
+        if not task_selection:
+            messagebox.showwarning("Input Error", "Please select a task.")
+            return
+
+        if not member_selection:
+            messagebox.showwarning("Input Error", "Please select a member.")
+            return
+
+        if not date_assigned:
+            messagebox.showwarning("Input Error", "Date assigned is required.")
+            return
+
+        # Validate date format (basic validation)
+        import re
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_assigned):
+            messagebox.showwarning("Input Error", "Date assigned must be in YYYY-MM-DD format.")
+            return
+
+        if not status:
+            messagebox.showwarning("Input Error", "Please select a status.")
+            return
+
+        # Get TaskID from the selection
+        task_id = None
+        for tid, tname in self.tasks_list:
+            if tname == task_selection:
+                task_id = tid
+                break
+
+        if task_id is None:
+            messagebox.showerror("Error", "Could not determine Task ID.")
+            return
+
+        # Get MemberID from the selection
+        member_id = None
+        for mid, mname in self.members_list:
+            if mname == member_selection:
+                member_id = mid
+                break
+
+        if member_id is None:
+            messagebox.showerror("Error", "Could not determine Member ID.")
+            return
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                INSERT INTO Assignment (TaskID, MemberID, DateAssigned, Status)
+                VALUES (%s, %s, %s, %s)
+            """, (task_id, member_id, date_assigned, status))
+
+            self.connection.commit()
+            cursor.close()
+
+            messagebox.showinfo("Success", "Task assigned successfully.")
+
+            # Clear the form
+            self.assign_task_combo.set('')
+            self.assign_member_combo.set('')
+            self.assign_date_entry.delete(0, tk.END)
+            self.assign_status_combo.set('')
+
+            # Refresh dropdowns
+            self._load_tasks_for_assignment()
+            self._load_members_for_assignment()
+
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to assign task: {e}")
 
 
 if __name__ == "__main__":

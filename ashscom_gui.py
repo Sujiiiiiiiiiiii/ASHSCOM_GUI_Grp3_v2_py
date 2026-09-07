@@ -305,7 +305,7 @@ class AshscomGUI:
 
         ttk.Label(entry_frame, text="Role:").grid(row=5, column=0, padx=8, pady=6, sticky="w")
         self.role_combo = ttk.Combobox(entry_frame, width=37, state="readonly",
-                                        values=["Election Candidate", "Chairperson", "Secretary-General", "Finance Officer",
+                                        values=["Chairperson", "Secretary-General", "Finance Officer",
                                                 "G12 Commissioner", "G11 Commissioner", "Public Information Officer",
                                                 "Auditor", "Committee Head Commissioner", "Asst. Committee Head Commissioner", "Member"])
         self.role_combo.grid(row=5, column=1, padx=20, pady=6)

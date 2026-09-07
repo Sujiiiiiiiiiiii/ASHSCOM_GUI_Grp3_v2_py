@@ -379,11 +379,14 @@ class AshscomGUI:
             "Update.TButton",
             font=("Segoe UI", 10, "bold"),
             padding=8,
-            background=ADDU_GOLD,
-            foreground="#00205B", 
+            background="#157347",
+            foreground="#FFFFFF", 
         )
-        style.map("Update.TButton", background=[("active", "#F2C230")])
-        
+        style.map(
+            "Update.TButton", 
+            background=[("active", "#157347"), ("disabled", "#7ED985")],
+            foreground=[("disabled", "#FFFFFF")],
+        )
         style.configure(
             "Delete.TButton",
             font=("Segoe UI", 10, "bold"),
@@ -698,7 +701,7 @@ class AshscomGUI:
             command=self.update_student,
             state="disabled",
         )
-        self.update_btn.grid(
+        self.update_btn.grid( 
             row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
         )
 

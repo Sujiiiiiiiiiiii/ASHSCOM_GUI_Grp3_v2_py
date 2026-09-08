@@ -778,14 +778,14 @@ class AshscomGUI:
         search_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
         self.search_var.trace_add("write", lambda *args: self.refresh_table_view())
 
-        self.student_tree = self._build_tree(self.data_frame)
+        self.student_tree = self._build_student_tree(self.data_frame)
         self.student_tree.bind(
             "<<TreeviewSelect>>", lambda e: self.on_student_select(self.student_tree)
         )
 
         self.lock_frame.tkraise()
 
-    def _build_tree(self, parent):
+    def _build_student_tree(self, parent):
         tree_frame = ttk.Frame(parent)
         tree_frame.pack(fill="both", expand=True, padx=8, pady=(0, 13))
 
@@ -829,6 +829,41 @@ class AshscomGUI:
         tree.heading("addu_email", text="Email", anchor=tk.CENTER)
         tree.heading("committee", text="Committee", anchor=tk.CENTER)
         tree.heading("role", text="Role", anchor=tk.CENTER)
+
+        tree.tag_configure("evenrow", background="#F3FFF4")
+        tree.tag_configure("oddrow", background="#FFFFFF")
+        return tree
+
+    def _build_task_tree(self, parent):
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(fill="both", expand=True, padx=0, pady=0)
+
+        tree_scroll_y = ttk.Scrollbar(tree_frame)
+        tree_scroll_y.pack(side="right", fill="y")
+        tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
+        tree_scroll_x.pack(side="bottom", fill="x")
+
+        tree = ttk.Treeview(
+            tree_frame,
+            yscrollcommand=tree_scroll_y.set,
+            xscrollcommand=tree_scroll_x.set,
+            selectmode="browse",
+        )
+        tree.pack(fill="both", expand=True)
+        tree_scroll_y.config(command=tree.yview)
+        tree_scroll_x.config(command=tree.xview)
+
+        tree["columns"] = ("id", "task_name", "assigned_to", "status")
+        tree.column("#0", width=0, stretch=tk.NO)
+        tree.column("id", width=50, anchor=tk.CENTER, stretch=True)
+        tree.column("task_name", width=300, anchor=tk.W, stretch=True)
+        tree.column("assigned_to", width=200, anchor=tk.W, stretch=True)
+        tree.column("status", width=100, anchor=tk.CENTER, stretch=True)
+
+        tree.heading("id", text="ID", anchor=tk.CENTER)
+        tree.heading("task_name", text="Task Name", anchor=tk.CENTER)
+        tree.heading("assigned_to", text="Assigned To", anchor=tk.CENTER)
+        tree.heading("status", text="Status", anchor=tk.CENTER)
 
         tree.tag_configure("evenrow", background="#F3FFF4")
         tree.tag_configure("oddrow", background="#FFFFFF")
@@ -1046,16 +1081,16 @@ class AshscomGUI:
         container = ttk.Frame(settings_frame)
         container.pack(fill="both", expand=True, padx=15, pady=15)
         container.columnconfigure(0, weight=1)
-        container.rowconfigure(0, weight=1)
-        container.rowconfigure(1, weight=1)
+        container.rowconfigure(0, weight=1, uniform="task_sections")
+        container.rowconfigure(1, weight=1, uniform="task_sections")
 
         # --- Task Management section (top) ---
         task_management_frame = ttk.LabelFrame(container, text="Task Management")
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
-        # Placeholder label
-        ttk.Label(task_management_frame, text="Placeholder").pack(
-            expand=True, padx=20, pady=20
+        self.tasks_tree = self._build_task_tree(task_management_frame)
+        self.tasks_tree.bind(
+            "<<TreeviewSelect>>", lambda e: self.on_task_select(self.tasks_tree)
         )
 
         # --- Assignment Management section (bottom) ---
@@ -1097,6 +1132,21 @@ class AshscomGUI:
             self.refresh_table_view()
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load students: {e}")
+
+    def load_tasks(self):
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT t.TaskID, t.TaskName, c.CommitteeName, t.DueDate
+                FROM Task t
+                LEFT JOIN Committee c ON t.CommitteeID = c.CommitteeID
+            """)
+            rows = cursor.fetchall()
+            cursor.close()
+
+            self._tasks_rows = rows
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to load tasks: {e}")
 
     def refresh_table_view(self):
         for item in self.student_tree.get_children():

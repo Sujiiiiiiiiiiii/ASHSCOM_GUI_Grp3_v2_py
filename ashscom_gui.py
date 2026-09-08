@@ -1146,11 +1146,33 @@ class AshscomGUI:
         field_width = 22
         row_pady = 6
 
+        view_row = ttk.Frame(parent)
+        view_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 4))
+        view_row.columnconfigure(0, weight=0)
+        view_row.columnconfigure(1, weight=1)
+
+        # Search bar for filtering tasks/assignments
+        search_wrap = tk.Frame(view_row, bg="#7ED985", bd=0)
+        search_wrap.pack(side="left", fill="x", expand=True)
+        
+        search_inner = tk.Frame(search_wrap, bg="white")
+        search_inner.pack(fill="both", expand=True, padx=1, pady=1)
+
+        tk.Label(search_inner, text="🔍", bg="white", fg="#6B6B6B",
+        font=("Segoe UI", 10)).pack(side="left", padx=(10, 4), pady=6)
+        
+        self.search_var = tk.StringVar()
+        search_entry = tk.Entry(search_inner, textvariable=self.search_var,
+        bg="white", fg="#0F1A0F", relief="flat",
+        font=("Segoe UI", 10), bd=0)
+        search_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
+        self.search_var.trace_add("write", lambda *args: self.refresh_table_view())
+
         ttk.Label(parent, text="Task Name:").grid(
-            row=0, column=0, padx=10, pady=row_pady, sticky="w"
+            row=1, column=0, padx=10, pady=row_pady, sticky="w"
         )
         ttk.Entry(parent, width=field_width).grid(
-            row=0, column=1, padx=10, pady=row_pady, sticky="ew"
+            row=1, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
         ttk.Label(parent, text="Committee:").grid(

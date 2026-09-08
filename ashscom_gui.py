@@ -1168,15 +1168,36 @@ class AshscomGUI:
         search_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
         self.search_var.trace_add("write", lambda *args: self.refresh_table_view())
 
+        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(
+                    side="left", padx=(0, 5)
+                )
+        self.view_combo = ModernDropdown(
+                    view_row,
+                    width=20,
+                    state="readonly",
+                    values=[
+                        "All Students",
+                        "ASHSCOM Members",
+                        "Election Candidates",
+                        "Committee Heads",
+                    ],
+                )
+        self.view_combo.set("All Students")
+        self.view_combo.pack(side="left", padx=(0, 12))
+        self.view_combo.bind(
+                    "<<ComboboxSelected>>",
+                    lambda e: (self.refresh_table_view(), self._clear_combo_highlight(e)),
+                )
+
         ttk.Label(parent, text="Task Name:").grid(
-            row=1, column=0, padx=10, pady=row_pady, sticky="w"
+            row=2, column=0, padx=10, pady=row_pady, sticky="w"
         )
         ttk.Entry(parent, width=field_width).grid(
-            row=1, column=1, padx=10, pady=row_pady, sticky="ew"
+            row=2, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
         ttk.Label(parent, text="Committee:").grid(
-            row=4, column=0, padx=10, pady=row_pady, sticky="w"
+            row=3, column=0, padx=10, pady=row_pady, sticky="w"
         )
         committee_combo = ModernDropdown(
             parent, width=field_width, state="readonly"
@@ -1185,14 +1206,14 @@ class AshscomGUI:
             name for (_id, name) in self.committees_list
         ]
         committee_combo.grid(
-            row=4, column=1, padx=10, pady=row_pady, sticky="ew"
+            row=3, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
         ttk.Label(parent, text="Due Date:").grid(
-            row=5, column=0, padx=10, pady=row_pady, sticky="w"
+            row=4, column=0, padx=10, pady=row_pady, sticky="w"
         )
         ttk.Entry(parent, width=field_width).grid(
-            row=5, column=1, padx=10, pady=row_pady, sticky="ew"
+            row=4, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
         ttk.Button(

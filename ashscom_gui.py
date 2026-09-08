@@ -1133,29 +1133,6 @@ class AshscomGUI:
         )
         self._build_update_assignments(update_assignments_frame)
 
-        action_row = ttk.Frame(container)
-        action_row.grid(row=2, column=1, sticky="ew", padx=(80, 0), pady=(10, 0))
-        action_row.columnconfigure(0, weight=1)
-        action_row.columnconfigure(1, weight=1)
-
-        self.assignment_update_btn = ttk.Button(
-            action_row,
-            text="🔼 Update Assignment",
-            style="Update.TButton",
-            command=self.update_assignment,
-            state="disabled",
-        )
-        self.assignment_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
-
-        self.assignment_delete_btn = ttk.Button(
-            action_row,
-            text="🗑 Delete Assignment",
-            style="Delete.TButton",
-            command=self.delete_assignment,
-            state="disabled",
-        )
-        self.assignment_delete_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
-
         task_management_frame = ttk.LabelFrame(container, text="Task Management")
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
         self.tasks_tree = self._build_task_tree(task_management_frame)
@@ -1376,6 +1353,31 @@ class AshscomGUI:
             self.update_assignment_status_combo.grid(
                 row=4, column=1, padx=10, pady=row_pady, sticky="ew"
             )
+    
+            assignment_button_row = ttk.Frame(parent)
+            assignment_button_row.grid(
+                row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
+            )
+            assignment_button_row.columnconfigure(0, weight=1)
+            assignment_button_row.columnconfigure(1, weight=1)
+    
+            self.assignment_update_btn = ttk.Button(
+                assignment_button_row,
+                text="🔼 Update Assignment",
+                style="Update.TButton",
+                command=self.update_assignment,
+                state="disabled",
+            )
+            self.assignment_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
+    
+            self.assignment_delete_btn = ttk.Button(
+                assignment_button_row,
+                text="🗑 Delete Assignment",
+                style="Delete.TButton",
+                command=self.delete_assignment,
+                state="disabled",
+            )
+            self.assignment_delete_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
     
     def _on_update_task_selected(self):
         selected = self.tasks_tree.focus()

@@ -853,17 +853,17 @@ class AshscomGUI:
         tree_scroll_y.config(command=tree.yview)
         tree_scroll_x.config(command=tree.xview)
 
-        tree["columns"] = ("id", "task_name", "assigned_to", "status")
+        tree["columns"] = ("id", "task_name", "committee", "due_date")
         tree.column("#0", width=0, stretch=tk.NO)
         tree.column("id", width=50, anchor=tk.CENTER, stretch=True)
         tree.column("task_name", width=300, anchor=tk.W, stretch=True)
-        tree.column("assigned_to", width=200, anchor=tk.W, stretch=True)
-        tree.column("status", width=100, anchor=tk.CENTER, stretch=True)
+        tree.column("committee", width=200, anchor=tk.W, stretch=True)
+        tree.column("due_date", width=140, anchor=tk.CENTER, stretch=True)
 
         tree.heading("id", text="ID", anchor=tk.CENTER)
         tree.heading("task_name", text="Task Name", anchor=tk.CENTER)
-        tree.heading("assigned_to", text="Assigned To", anchor=tk.CENTER)
-        tree.heading("status", text="Status", anchor=tk.CENTER)
+        tree.heading("committee", text="Committee", anchor=tk.CENTER)
+        tree.heading("due_date", text="Due Date", anchor=tk.CENTER)
 
         tree.tag_configure("evenrow", background="#F3FFF4")
         tree.tag_configure("oddrow", background="#FFFFFF")
@@ -1088,10 +1088,12 @@ class AshscomGUI:
         task_management_frame = ttk.LabelFrame(container, text="Task Management")
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
+        self._build_task_update_form(task_management_frame)
         self.tasks_tree = self._build_task_tree(task_management_frame)
         self.tasks_tree.bind(
-            "<<TreeviewSelect>>", lambda e: self.on_task_select(self.tasks_tree)
+            "<<TreeviewSelect>>", lambda e: self._on_task_selected(self.tasks_tree)
         )
+        self.load_tasks()
 
         # --- Assignment Management section (bottom) ---
         assignment_management_frame = ttk.LabelFrame(
@@ -1099,10 +1101,137 @@ class AshscomGUI:
         )
         assignment_management_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
 
+        self._build_assignment_update_form(assignment_management_frame)
         self.assignments_tree = self._build_assignment_tree(
             assignment_management_frame
         )
+        self.assignments_tree.bind(
+            "<<TreeviewSelect>>",
+            lambda e: self._on_assignment_selected(self.assignments_tree),
+        )
         self.load_assignments()
+
+    def _build_task_update_form(self, parent):
+        form_frame = ttk.Frame(parent)
+        form_frame.pack(fill="x", padx=8, pady=(6, 4))
+        form_frame.columnconfigure(1, weight=1)
+        form_frame.columnconfigure(3, weight=1)
+
+        ttk.Label(form_frame, text="Task Name:").grid(
+            row=0, column=0, padx=(0, 5), pady=3, sticky="w"
+        )
+        self.task_update_name_entry = ttk.Entry(form_frame, width=22)
+        self.task_update_name_entry.grid(
+            row=0, column=1, padx=(0, 10), pady=3, sticky="ew"
+        )
+
+        ttk.Label(form_frame, text="Committee:").grid(
+            row=0, column=2, padx=(0, 5), pady=3, sticky="w"
+        )
+        self.task_update_committee_combo = ModernDropdown(
+            form_frame, width=18, state="readonly"
+        )
+        self.task_update_committee_combo["values"] = [
+            name for (_id, name) in self.committees_list
+        ]
+        self.task_update_committee_combo.grid(
+            row=0, column=3, padx=(0, 10), pady=3, sticky="ew"
+        )
+
+        ttk.Label(form_frame, text="Due Date:").grid(
+            row=0, column=4, padx=(0, 5), pady=3, sticky="w"
+        )
+        self.task_update_due_date_entry = ttk.Entry(form_frame, width=14)
+        self.task_update_due_date_entry.grid(
+            row=0, column=5, padx=(0, 10), pady=3, sticky="ew"
+        )
+
+        self.task_update_btn = ttk.Button(
+            form_frame,
+            text="🔼 Update Task",
+            style="Update.TButton",
+            command=self.update_task,
+            state="disabled",
+        )
+        self.task_update_btn.grid(row=0, column=6, padx=(0, 0), pady=3)
+
+        self.task_delete_btn = ttk.Button(
+            form_frame,
+            text="🗑 Delete Task",
+            style="Delete.TButton",
+            command=self.delete_task,
+            state="disabled",
+        )
+        self.task_delete_btn.grid(row=0, column=7, padx=(0, 0), pady=3)
+
+    def _build_assignment_update_form(self, parent):
+        form_frame = ttk.Frame(parent)
+        form_frame.pack(fill="x", padx=8, pady=(6, 4))
+        form_frame.columnconfigure(1, weight=1)
+        form_frame.columnconfigure(3, weight=1)
+
+        ttk.Label(form_frame, text="Task:").grid(
+            row=0, column=0, padx=(0, 5), pady=3, sticky="w"
+        )
+        self.assignment_update_task_combo = ModernDropdown(
+            form_frame, width=18, state="readonly"
+        )
+        self.assignment_update_task_combo["values"] = [
+            name for (_id, name) in self.tasks_list
+        ]
+        self.assignment_update_task_combo.grid(
+            row=0, column=1, padx=(0, 10), pady=3, sticky="ew"
+        )
+
+        ttk.Label(form_frame, text="Member:").grid(
+            row=0, column=2, padx=(0, 5), pady=3, sticky="w"
+        )
+        self.assignment_update_member_combo = ModernDropdown(
+            form_frame, width=18, state="readonly"
+        )
+        self.assignment_update_member_combo["values"] = [
+            name for (_id, name) in self.members_list
+        ]
+        self.assignment_update_member_combo.grid(
+            row=0, column=3, padx=(0, 10), pady=3, sticky="ew"
+        )
+
+        ttk.Label(form_frame, text="Date:").grid(
+            row=0, column=4, padx=(0, 5), pady=3, sticky="w"
+        )
+        self.assignment_update_date_entry = ttk.Entry(form_frame, width=14)
+        self.assignment_update_date_entry.grid(
+            row=0, column=5, padx=(0, 10), pady=3, sticky="ew"
+        )
+
+        ttk.Label(form_frame, text="Status:").grid(
+            row=0, column=6, padx=(0, 5), pady=3, sticky="w"
+        )
+        self.assignment_update_status_combo = ModernDropdown(
+            form_frame, width=14, state="readonly",
+            values=["Pending", "In Progress", "Completed", "Cancelled"],
+        )
+        self.assignment_update_status_combo.grid(
+            row=0, column=7, padx=(0, 10), pady=3, sticky="ew"
+        )
+
+        self.assignment_update_btn = ttk.Button(
+            form_frame,
+            text="🔼 Update Assignment",
+            style="Update.TButton",
+            command=self.update_assignment,
+            state="disabled",
+        )
+        self.assignment_update_btn.grid(row=0, column=8, pady=3)
+
+        self.assignment_delete_btn = ttk.Button(
+            form_frame,
+            text="🗑 Delete Assignment",
+            style="Delete.TButton",
+            command=self.delete_assignment,
+            state="disabled",
+        )
+        self.assignment_delete_btn.grid(row=0, column=9, pady=3)
 
     def load_students(self):
         try:
@@ -1202,6 +1331,202 @@ class AshscomGUI:
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load assignments: {e}")
 
+    def _on_task_selected(self, tree):
+        selected = tree.focus()
+        if not selected:
+            return
+        values = tree.item(selected, "values")
+        if not values:
+            return
+
+        self.task_update_name_entry.delete(0, tk.END)
+        self.task_update_name_entry.insert(0, values[1])
+        self.task_update_committee_combo.set(values[2] if values[2] else "")
+        self.task_update_due_date_entry.delete(0, tk.END)
+        self.task_update_due_date_entry.insert(0, values[3] if values[3] else "")
+        self._selected_task_id = values[0]
+        self.task_update_btn.config(state="normal")
+        self.task_delete_btn.config(state="normal")
+
+    def _on_assignment_selected(self, tree):
+        selected = tree.focus()
+        if not selected:
+            return
+        values = tree.item(selected, "values")
+        if not values:
+            return
+
+        self.assignment_update_task_combo.set(values[1] if values[1] else "")
+        self.assignment_update_member_combo.set(values[2] if values[2] else "")
+        self.assignment_update_date_entry.delete(0, tk.END)
+        self.assignment_update_date_entry.insert(0, values[3] if values[3] else "")
+        self.assignment_update_status_combo.set(values[4] if values[4] else "")
+        self._selected_assignment_id = values[0]
+        self.assignment_update_btn.config(state="normal")
+        self.assignment_delete_btn.config(state="normal")
+
+    def update_task(self):
+        if not hasattr(self, "_selected_task_id"):
+            messagebox.showwarning("Selection Error", "Please select a task to update.")
+            return
+
+        task_name = self.task_update_name_entry.get().strip()
+        committee_name = self.task_update_committee_combo.get()
+        due_date = self.task_update_due_date_entry.get().strip()
+        committee_id = next(
+            (cid for cid, name in self.committees_list if name == committee_name),
+            None,
+        )
+
+        if not task_name or not committee_id or not due_date:
+            messagebox.showwarning("Input Error", "All task fields are required.")
+            return
+
+        import re
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", due_date):
+            messagebox.showwarning(
+                "Input Error", "Due date must be in YYYY-MM-DD format."
+            )
+            return
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """
+                UPDATE Task
+                SET TaskName=%s, CommitteeID=%s, DueDate=%s
+                WHERE TaskID=%s
+                """,
+                (task_name, committee_id, due_date, self._selected_task_id),
+            )
+            self.connection.commit()
+            cursor.close()
+            self.load_tasks()
+            self._load_tasks_for_assignment()
+            self.load_assignments()
+            self.task_update_btn.config(state="disabled")
+            self.task_delete_btn.config(state="disabled")
+            messagebox.showinfo("Success", "Task updated successfully.")
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to update task: {e}")
+
+    def update_assignment(self):
+        if not hasattr(self, "_selected_assignment_id"):
+            messagebox.showwarning(
+                "Selection Error", "Please select an assignment to update."
+            )
+            return
+
+        task_name = self.assignment_update_task_combo.get()
+        member_name = self.assignment_update_member_combo.get()
+        date_assigned = self.assignment_update_date_entry.get().strip()
+        status = self.assignment_update_status_combo.get()
+        task_id = next(
+            (tid for tid, name in self.tasks_list if name == task_name), None
+        )
+        member_id = next(
+            (mid for mid, name in self.members_list if name == member_name), None
+        )
+
+        if not task_id or not member_id or not date_assigned or not status:
+            messagebox.showwarning(
+                "Input Error", "All assignment fields are required."
+            )
+            return
+
+        import re
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_assigned):
+            messagebox.showwarning(
+                "Input Error", "Date assigned must be in YYYY-MM-DD format."
+            )
+            return
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """
+                UPDATE Assignment
+                SET TaskID=%s, MemberID=%s, DateAssigned=%s, Status=%s
+                WHERE AssignmentID=%s
+                """,
+                (
+                    task_id,
+                    member_id,
+                    date_assigned,
+                    status,
+                    self._selected_assignment_id,
+                ),
+            )
+            self.connection.commit()
+            cursor.close()
+            self.load_assignments()
+            self.assignment_update_btn.config(state="disabled")
+            self.assignment_delete_btn.config(state="disabled")
+            messagebox.showinfo("Success", "Assignment updated successfully.")
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to update assignment: {e}")
+
+    def delete_task(self):
+        if not hasattr(self, "_selected_task_id"):
+            messagebox.showwarning("Selection Error", "Please select a task to delete.")
+            return
+
+        task_id = self._selected_task_id
+        if not messagebox.askyesno(
+            "Confirm Delete", f"Are you sure you want to delete Task #{task_id}?"
+        ):
+            return
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("DELETE FROM Task WHERE TaskID=%s", (task_id,))
+            self.connection.commit()
+            cursor.close()
+            self.load_tasks()
+            self._load_tasks_for_assignment()
+            self.task_update_name_entry.delete(0, tk.END)
+            self.task_update_committee_combo.set("")
+            self.task_update_due_date_entry.delete(0, tk.END)
+            self.task_update_btn.config(state="disabled")
+            self.task_delete_btn.config(state="disabled")
+            messagebox.showinfo("Success", "Task deleted successfully.")
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to delete task: {e}")
+
+    def delete_assignment(self):
+        if not hasattr(self, "_selected_assignment_id"):
+            messagebox.showwarning(
+                "Selection Error", "Please select an assignment to delete."
+            )
+            return
+
+        assignment_id = self._selected_assignment_id
+        if not messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete Assignment #{assignment_id}?",
+        ):
+            return
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "DELETE FROM Assignment WHERE AssignmentID=%s", (assignment_id,)
+            )
+            self.connection.commit()
+            cursor.close()
+            self.load_assignments()
+            self.assignment_update_task_combo.set("")
+            self.assignment_update_member_combo.set("")
+            self.assignment_update_date_entry.delete(0, tk.END)
+            self.assignment_update_status_combo.set("")
+            self.assignment_update_btn.config(state="disabled")
+            self.assignment_delete_btn.config(state="disabled")
+            messagebox.showinfo("Success", "Assignment deleted successfully.")
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to delete assignment: {e}")
+
     def load_tasks(self):
         try:
             cursor = self.connection.cursor()
@@ -1214,6 +1539,17 @@ class AshscomGUI:
             cursor.close()
 
             self._tasks_rows = rows
+
+            for item in self.tasks_tree.get_children():
+                self.tasks_tree.delete(item)
+
+            for index, row in enumerate(rows):
+                tag = "evenrow" if index % 2 == 0 else "oddrow"
+                self.tasks_tree.insert("", tk.END, values=row, tags=(tag,))
+            if hasattr(self, "assignment_update_task_combo"):
+                self.assignment_update_task_combo["values"] = [
+                    name for (_id, name, _committee, _due_date) in rows
+                ]
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load tasks: {e}")
 
@@ -1592,6 +1928,7 @@ class AshscomGUI:
 
             # Refresh the committee dropdown in case new committees were added
             self._load_committees_for_task()
+            self.load_tasks()
 
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to add task: {e}")
@@ -1629,6 +1966,8 @@ class AshscomGUI:
             self.assign_member_combo["values"] = member_names
             if member_names:
                 self.assign_member_combo.current(0)
+            if hasattr(self, "assignment_update_member_combo"):
+                self.assignment_update_member_combo["values"] = member_names
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load members: {e}")
 

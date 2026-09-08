@@ -1118,12 +1118,19 @@ class AshscomGUI:
         container.rowconfigure(0, weight=1, uniform="task_sections")
         container.rowconfigure(1, weight=1, uniform="task_sections")
 
-        update_tasks_assignments = ttk.LabelFrame(container, text="Update Tasks")
-        update_tasks_assignments.grid(
-            row=0, column=1, rowspan=2, sticky="nw", padx=(80, 0), pady=0
+        update_tasks_frame = ttk.LabelFrame(container, text="Update Tasks")
+        update_tasks_frame.grid(
+            row=0, column=1, sticky="nw", padx=(80, 0), pady=(0, 8)
         )
-        self._build_update_tasks(update_tasks_assignments)
-        self._build_update_assignments(update_tasks_assignments)
+        self._build_update_tasks(update_tasks_frame)
+
+        update_assignments_frame = ttk.LabelFrame(
+            container, text="Update Assignment"
+        )
+        update_assignments_frame.grid(
+            row=1, column=1, sticky="nw", padx=(80, 0), pady=(8, 0)
+        )
+        self._build_update_assignments(update_assignments_frame)
 
         task_management_frame = ttk.LabelFrame(container, text="Task Management")
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
@@ -1238,7 +1245,7 @@ class AshscomGUI:
             row_pady = 6
     
             view_row = ttk.Frame(parent)
-            view_row.grid(row=10, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 4))
+            view_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 4))
             view_row.columnconfigure(0, weight=0)
             view_row.columnconfigure(1, weight=1)
     
@@ -1281,14 +1288,14 @@ class AshscomGUI:
                     )
     
             ttk.Label(parent, text="Task Name:").grid(
-                row=11, column=0, padx=10, pady=row_pady, sticky="w"
+                row=1, column=0, padx=10, pady=row_pady, sticky="w"
             )
             ttk.Entry(parent, width=field_width).grid(
-                row=11, column=1, padx=10, pady=row_pady, sticky="ew"
+                row=1, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
             ttk.Label(parent, text="Committee:").grid(
-                row=12, column=0, padx=10, pady=row_pady, sticky="w"
+                row=2, column=0, padx=10, pady=row_pady, sticky="w"
             )
             committee_combo = ModernDropdown(
                 parent, width=field_width, state="readonly"
@@ -1297,14 +1304,14 @@ class AshscomGUI:
                 name for (_id, name) in self.committees_list
             ]
             committee_combo.grid(
-                row=12, column=1, padx=10, pady=row_pady, sticky="ew"
+                row=2, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
             ttk.Label(parent, text="Due Date:").grid(
-                row=13, column=0, padx=10, pady=row_pady, sticky="w"
+                row=3, column=0, padx=10, pady=row_pady, sticky="w"
             )
             ttk.Entry(parent, width=field_width).grid(
-                row=13, column=1, padx=10, pady=row_pady, sticky="ew"
+                row=3, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
             ttk.Button(
@@ -1312,14 +1319,14 @@ class AshscomGUI:
                 text="🔼 Update Selected",
                 style="Update.TButton",
                 state="disabled",
-            ).grid(row=14, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew")
+            ).grid(row=4, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew")
     
             ttk.Button(
                 parent,
                 text="🗑 Delete Selected",
                 style="Delete.TButton",
                 state="disabled",
-            ).grid(row=15, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew")
+            ).grid(row=5, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew")
 
     def _build_task_update_form(self, parent):
         form_frame = ttk.Frame(parent)

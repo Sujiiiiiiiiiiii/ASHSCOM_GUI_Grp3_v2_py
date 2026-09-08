@@ -14,7 +14,6 @@ GRADE_SECTIONS = {
         "GARNET",
         "GARNIER",
         "GAVAN",
-        "GONZALES",
         "HERNANDEZ",
         "HOLLAND",
         "HURTADO",
@@ -36,7 +35,6 @@ GRADE_SECTIONS = {
         "OLDCORNE",
         "OTA",
         "OWEN",
-        "PACHECO",
         "PAGE",
         "PANTALIA",
         "PEREZ",
@@ -614,6 +612,7 @@ class AshscomGUI:
         FIELD_WIDTH = 22
         ROW_PADY = 6
 
+        # --- Form fields ---
         ttk.Label(form_frame, text="Student Name:").grid(
             row=0, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
@@ -785,6 +784,24 @@ class AshscomGUI:
 
         self.lock_frame.tkraise()
 
+    def create_tasks_assignments_tab(self, parent):
+        settings_frame = ttk.Frame(parent)
+        settings_frame.grid(row=0, column=0, sticky="nsew")
+        self.pages["tasks/assignments"] = settings_frame
+
+        overview_frame = ttk.LabelFrame(settings_frame, text="Task/Assignment Management")
+        overview_frame.pack(fill="both", expand=True, padx=15, pady=15)
+
+        overview_frame.columnconfigure(0, weight=0)
+        overview_frame.columnconfigure(1, weight=1)
+        overview_frame.rowconfigure(0, weight=1)
+
+        form_frame = ttk.LabelFrame(overview_frame, text="Update Task/Assignment")
+        form_frame.grid(row=0, column=0, sticky="new", padx=(10, 5), pady=(10, 11))
+
+        left_col = ttk.Frame(overview_frame)
+        left_col.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
+
     def _build_student_tree(self, parent):
         tree_frame = ttk.Frame(parent)
         tree_frame.pack(fill="both", expand=True, padx=8, pady=(0, 13))
@@ -811,19 +828,35 @@ class AshscomGUI:
             "section",
             "addu_email",
             "committee",
-            "role",
+            "role"
+        )
+        form_frame = ttk.LabelFrame(parent, text="Add Task/Assignment")
+        form_frame.pack(fill="x", padx=15, pady=(0, 15))
+        form_frame.columnconfigure(0, weight=0, minsize=110)
+        form_frame.columnconfigure(1, weight=1)
+        field_width = 22
+        ttk.Label(form_frame, text="Task Name:").grid(
+            row=0, column=0, padx=10, pady=6, sticky="w"
+        )
+        self.task_name_entry = ttk.Entry(form_frame, width=field_width)
+        self.task_name_entry.grid(
+            row=0, column=1, padx=10, pady=6, sticky="ew"
         )
         tree.column("#0", width=0, stretch=tk.NO)
         tree.column("id", width=50, anchor=tk.CENTER, stretch=False)
         tree.column("name", width=200, anchor=tk.W, stretch=False)
         tree.column("grade_level", width=80, anchor=tk.CENTER, stretch=False)
-        tree.column("section", width=100, anchor=tk.CENTER, stretch=False)
+        self.task_committee_combo = ModernDropdown(
+            form_frame, width=field_width, state="readonly"
+        )
+        self.task_committee_combo.grid(row=1, column=1, padx=10, pady=6, sticky="ew")
         tree.column("addu_email", width=220, anchor=tk.W, stretch=False)
         tree.column("committee", width=140, anchor=tk.CENTER, stretch=False)
         tree.column("role", width=180, anchor=tk.CENTER, stretch=False)
 
         tree.heading("id", text="ID", anchor=tk.CENTER)
-        tree.heading("name", text="Name", anchor=tk.CENTER)
+        self.task_due_date_entry = ttk.Entry(form_frame, width=field_width)
+        self.task_due_date_entry.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
         tree.heading("grade_level", text="Grade", anchor=tk.CENTER)
         tree.heading("section", text="Section", anchor=tk.CENTER)
         tree.heading("addu_email", text="Email", anchor=tk.CENTER)
@@ -892,6 +925,7 @@ class AshscomGUI:
         _FW = 22
         _PY = 6
 
+        # --- Form fields ---
         ttk.Label(entry_frame, text="Student Name:").grid(
             row=0, column=0, padx=10, pady=_PY, sticky="w"
         )
@@ -1077,43 +1111,85 @@ class AshscomGUI:
         settings_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["task/assignment"] = settings_frame
 
-        # Create a container for the two sections
         container = ttk.Frame(settings_frame)
         container.pack(fill="both", expand=True, padx=15, pady=15)
-        container.columnconfigure(0, weight=1)
+        container.columnconfigure(0, weight=0, minsize=700)
+        container.columnconfigure(1, weight=1)
         container.rowconfigure(0, weight=1, uniform="task_sections")
         container.rowconfigure(1, weight=1, uniform="task_sections")
 
-        # --- Task Management section (top) ---
+        update_tasks_assignments = ttk.LabelFrame(container, text="Update Tasks/Assignments")
+        update_tasks_assignments.grid(
+            row=0, column=1, rowspan=2, sticky="nw", padx=(80, 0), pady=0
+        )
+        self._build_update_tasks_assignments(update_tasks_assignments)
+
         task_management_frame = ttk.LabelFrame(container, text="Task Management")
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
-
-        self._build_task_update_form(task_management_frame)
         self.tasks_tree = self._build_task_tree(task_management_frame)
-        self.tasks_tree.bind(
-            "<<TreeviewSelect>>", lambda e: self._on_task_selected(self.tasks_tree)
-        )
         self.load_tasks()
 
-        # --- Assignment Management section (bottom) ---
         assignment_management_frame = ttk.LabelFrame(
             container, text="Assignment Management"
         )
-        assignment_management_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
-
-        self._build_assignment_update_form(assignment_management_frame)
+        assignment_management_frame.grid(
+            row=1, column=0, sticky="nsew", pady=(5, 0)
+        )
         self.assignments_tree = self._build_assignment_tree(
             assignment_management_frame
         )
-        self.assignments_tree.bind(
-            "<<TreeviewSelect>>",
-            lambda e: self._on_assignment_selected(self.assignments_tree),
-        )
         self.load_assignments()
+
+    def _build_update_tasks_assignments(self, parent):
+        parent.columnconfigure(0, weight=0, minsize=110)
+        parent.columnconfigure(1, weight=1)
+        field_width = 22
+        row_pady = 6
+
+        ttk.Label(parent, text="Task Name:").grid(
+            row=0, column=0, padx=10, pady=row_pady, sticky="w"
+        )
+        ttk.Entry(parent, width=field_width).grid(
+            row=0, column=1, padx=10, pady=row_pady, sticky="ew"
+        )
+
+        ttk.Label(parent, text="Committee:").grid(
+            row=4, column=0, padx=10, pady=row_pady, sticky="w"
+        )
+        committee_combo = ModernDropdown(
+            parent, width=field_width, state="readonly"
+        )
+        committee_combo["values"] = [
+            name for (_id, name) in self.committees_list
+        ]
+        committee_combo.grid(
+            row=4, column=1, padx=10, pady=row_pady, sticky="ew"
+        )
+
+        ttk.Label(parent, text="Due Date:").grid(
+            row=5, column=0, padx=10, pady=row_pady, sticky="w"
+        )
+        ttk.Entry(parent, width=field_width).grid(
+            row=5, column=1, padx=10, pady=row_pady, sticky="ew"
+        )
+
+        ttk.Button(
+            parent,
+            text="🔼 Update Selected",
+            style="Update.TButton",
+            state="disabled",
+        ).grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew")
+
+        ttk.Button(
+            parent,
+            text="🗑 Delete Selected",
+            style="Delete.TButton",
+            state="disabled",
+        ).grid(row=7, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew")
 
     def _build_task_update_form(self, parent):
         form_frame = ttk.Frame(parent)
-        form_frame.pack(fill="x", padx=8, pady=(6, 4))
+        form_frame.pack(side="right", fill="y", padx=(8, 0), pady=8)
         form_frame.columnconfigure(1, weight=1)
         form_frame.columnconfigure(3, weight=1)
 
@@ -1126,7 +1202,7 @@ class AshscomGUI:
         )
 
         ttk.Label(form_frame, text="Committee:").grid(
-            row=0, column=2, padx=(0, 5), pady=3, sticky="w"
+            row=1, column=0, padx=(0, 5), pady=3, sticky="w"
         )
         self.task_update_committee_combo = ModernDropdown(
             form_frame, width=18, state="readonly"
@@ -1135,38 +1211,37 @@ class AshscomGUI:
             name for (_id, name) in self.committees_list
         ]
         self.task_update_committee_combo.grid(
-            row=0, column=3, padx=(0, 10), pady=3, sticky="ew"
+            row=1, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
 
         ttk.Label(form_frame, text="Due Date:").grid(
-            row=0, column=4, padx=(0, 5), pady=3, sticky="w"
+            row=2, column=0, padx=(0, 5), pady=3, sticky="w"
         )
         self.task_update_due_date_entry = ttk.Entry(form_frame, width=14)
         self.task_update_due_date_entry.grid(
-            row=0, column=5, padx=(0, 10), pady=3, sticky="ew"
+            row=2, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
 
-        self.task_update_btn = ttk.Button(
-            form_frame,
-            text="🔼 Update Task",
-            style="Update.TButton",
-            command=self.update_task,
-            state="disabled",
+        search_wrap = tk.Frame(form_frame, bg="#7ED985", bd=0)
+        search_wrap.grid(row=3, column=0, columnspan=2, padx=(0, 0), pady=3, sticky="ew")
+        search_inner = tk.Frame(search_wrap, bg="white")
+        search_inner.pack(fill="both", expand=True, padx=1, pady=1)
+        tk.Label(
+            search_inner, text="🔍", bg="white", fg="#6B6B6B",
+            font=("Segoe UI", 10)
+        ).pack(side="left", padx=(8, 4), pady=3)
+        self.task_search_var = tk.StringVar()
+        task_search_entry = tk.Entry(
+            search_inner, textvariable=self.task_search_var,
+            bg="white", fg="#0F1A0F", relief="flat",
+            font=("Segoe UI", 10), bd=0
         )
-        self.task_update_btn.grid(row=0, column=6, padx=(0, 0), pady=3)
-
-        self.task_delete_btn = ttk.Button(
-            form_frame,
-            text="🗑 Delete Task",
-            style="Delete.TButton",
-            command=self.delete_task,
-            state="disabled",
-        )
-        self.task_delete_btn.grid(row=0, column=7, padx=(0, 0), pady=3)
+        task_search_entry.pack(side="left", fill="x", expand=True, ipady=3, padx=(0, 8))
+        self.task_search_var.trace_add("write", lambda *args: self.refresh_task_table())
 
     def _build_assignment_update_form(self, parent):
         form_frame = ttk.Frame(parent)
-        form_frame.pack(fill="x", padx=8, pady=(6, 4))
+        form_frame.pack(side="right", fill="y", padx=(8, 0), pady=8)
         form_frame.columnconfigure(1, weight=1)
         form_frame.columnconfigure(3, weight=1)
 
@@ -1184,7 +1259,7 @@ class AshscomGUI:
         )
 
         ttk.Label(form_frame, text="Member:").grid(
-            row=0, column=2, padx=(0, 5), pady=3, sticky="w"
+            row=1, column=0, padx=(0, 5), pady=3, sticky="w"
         )
         self.assignment_update_member_combo = ModernDropdown(
             form_frame, width=18, state="readonly"
@@ -1193,45 +1268,48 @@ class AshscomGUI:
             name for (_id, name) in self.members_list
         ]
         self.assignment_update_member_combo.grid(
-            row=0, column=3, padx=(0, 10), pady=3, sticky="ew"
+            row=1, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
 
         ttk.Label(form_frame, text="Date:").grid(
-            row=0, column=4, padx=(0, 5), pady=3, sticky="w"
+            row=2, column=0, padx=(0, 5), pady=3, sticky="w"
         )
         self.assignment_update_date_entry = ttk.Entry(form_frame, width=14)
         self.assignment_update_date_entry.grid(
-            row=0, column=5, padx=(0, 10), pady=3, sticky="ew"
+            row=2, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
 
         ttk.Label(form_frame, text="Status:").grid(
-            row=0, column=6, padx=(0, 5), pady=3, sticky="w"
+            row=3, column=0, padx=(0, 5), pady=3, sticky="w"
         )
         self.assignment_update_status_combo = ModernDropdown(
             form_frame, width=14, state="readonly",
             values=["Pending", "In Progress", "Completed", "Cancelled"],
         )
         self.assignment_update_status_combo.grid(
-            row=0, column=7, padx=(0, 10), pady=3, sticky="ew"
+            row=3, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
 
-        self.assignment_update_btn = ttk.Button(
-            form_frame,
-            text="🔼 Update Assignment",
-            style="Update.TButton",
-            command=self.update_assignment,
-            state="disabled",
+        search_wrap = tk.Frame(form_frame, bg="#7ED985", bd=0)
+        search_wrap.grid(row=4, column=0, columnspan=2, pady=3, sticky="ew")
+        search_inner = tk.Frame(search_wrap, bg="white")
+        search_inner.pack(fill="both", expand=True, padx=1, pady=1)
+        tk.Label(
+            search_inner, text="🔍", bg="white", fg="#6B6B6B",
+            font=("Segoe UI", 10)
+        ).pack(side="left", padx=(8, 4), pady=3)
+        self.assignment_search_var = tk.StringVar()
+        assignment_search_entry = tk.Entry(
+            search_inner, textvariable=self.assignment_search_var,
+            bg="white", fg="#0F1A0F", relief="flat",
+            font=("Segoe UI", 10), bd=0
         )
-        self.assignment_update_btn.grid(row=0, column=8, pady=3)
-
-        self.assignment_delete_btn = ttk.Button(
-            form_frame,
-            text="🗑 Delete Assignment",
-            style="Delete.TButton",
-            command=self.delete_assignment,
-            state="disabled",
+        assignment_search_entry.pack(
+            side="left", fill="x", expand=True, ipady=3, padx=(0, 8)
         )
-        self.assignment_delete_btn.grid(row=0, column=9, pady=3)
+        self.assignment_search_var.trace_add(
+            "write", lambda *args: self.refresh_assignment_table()
+        )
 
     def load_students(self):
         try:
@@ -1319,17 +1397,28 @@ class AshscomGUI:
             """)
             rows = cursor.fetchall()
             cursor.close()
-
-            for item in self.assignments_tree.get_children():
-                self.assignments_tree.delete(item)
-
-            for index, row in enumerate(rows):
-                tag = "evenrow" if index % 2 == 0 else "oddrow"
-                self.assignments_tree.insert(
-                    "", tk.END, values=row, tags=(tag,)
-                )
+            self._assignment_rows = rows
+            self.refresh_assignment_table()
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load assignments: {e}")
+
+    def refresh_assignment_table(self):
+        for item in self.assignments_tree.get_children():
+            self.assignments_tree.delete(item)
+
+        query = (
+            self.assignment_search_var.get().strip().lower()
+            if hasattr(self, "assignment_search_var")
+            else ""
+        )
+        rows = [
+            row for row in getattr(self, "_assignment_rows", [])
+            if not query
+            or any(query in str(field).lower() for field in row if field is not None)
+        ]
+        for index, row in enumerate(rows):
+            tag = "evenrow" if index % 2 == 0 else "oddrow"
+            self.assignments_tree.insert("", tk.END, values=row, tags=(tag,))
 
     def _on_task_selected(self, tree):
         selected = tree.focus()
@@ -1345,8 +1434,6 @@ class AshscomGUI:
         self.task_update_due_date_entry.delete(0, tk.END)
         self.task_update_due_date_entry.insert(0, values[3] if values[3] else "")
         self._selected_task_id = values[0]
-        self.task_update_btn.config(state="normal")
-        self.task_delete_btn.config(state="normal")
 
     def _on_assignment_selected(self, tree):
         selected = tree.focus()
@@ -1362,8 +1449,6 @@ class AshscomGUI:
         self.assignment_update_date_entry.insert(0, values[3] if values[3] else "")
         self.assignment_update_status_combo.set(values[4] if values[4] else "")
         self._selected_assignment_id = values[0]
-        self.assignment_update_btn.config(state="normal")
-        self.assignment_delete_btn.config(state="normal")
 
     def update_task(self):
         if not hasattr(self, "_selected_task_id"):
@@ -1405,8 +1490,6 @@ class AshscomGUI:
             self.load_tasks()
             self._load_tasks_for_assignment()
             self.load_assignments()
-            self.task_update_btn.config(state="disabled")
-            self.task_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Task updated successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to update task: {e}")
@@ -1462,8 +1545,6 @@ class AshscomGUI:
             self.connection.commit()
             cursor.close()
             self.load_assignments()
-            self.assignment_update_btn.config(state="disabled")
-            self.assignment_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Assignment updated successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to update assignment: {e}")
@@ -1489,8 +1570,6 @@ class AshscomGUI:
             self.task_update_name_entry.delete(0, tk.END)
             self.task_update_committee_combo.set("")
             self.task_update_due_date_entry.delete(0, tk.END)
-            self.task_update_btn.config(state="disabled")
-            self.task_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Task deleted successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to delete task: {e}")
@@ -1521,8 +1600,6 @@ class AshscomGUI:
             self.assignment_update_member_combo.set("")
             self.assignment_update_date_entry.delete(0, tk.END)
             self.assignment_update_status_combo.set("")
-            self.assignment_update_btn.config(state="disabled")
-            self.assignment_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Assignment deleted successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to delete assignment: {e}")
@@ -1539,19 +1616,31 @@ class AshscomGUI:
             cursor.close()
 
             self._tasks_rows = rows
-
-            for item in self.tasks_tree.get_children():
-                self.tasks_tree.delete(item)
-
-            for index, row in enumerate(rows):
-                tag = "evenrow" if index % 2 == 0 else "oddrow"
-                self.tasks_tree.insert("", tk.END, values=row, tags=(tag,))
+            self.refresh_task_table()
             if hasattr(self, "assignment_update_task_combo"):
                 self.assignment_update_task_combo["values"] = [
                     name for (_id, name, _committee, _due_date) in rows
                 ]
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load tasks: {e}")
+
+    def refresh_task_table(self):
+        for item in self.tasks_tree.get_children():
+            self.tasks_tree.delete(item)
+
+        query = (
+            self.task_search_var.get().strip().lower()
+            if hasattr(self, "task_search_var")
+            else ""
+        )
+        rows = [
+            row for row in getattr(self, "_tasks_rows", [])
+            if not query
+            or any(query in str(field).lower() for field in row if field is not None)
+        ]
+        for index, row in enumerate(rows):
+            tag = "evenrow" if index % 2 == 0 else "oddrow"
+            self.tasks_tree.insert("", tk.END, values=row, tags=(tag,))
 
     def refresh_table_view(self):
         for item in self.student_tree.get_children():

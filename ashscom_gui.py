@@ -1232,19 +1232,27 @@ class AshscomGUI:
             row=4, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
-        ttk.Button(
+        self.task_update_btn = ttk.Button(
             parent,
             text="🔼 Update Selected",
             style="Update.TButton",
+            command=self.update_task,
             state="disabled",
-        ).grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew")
-
-        ttk.Button(
+        )
+        self.task_update_btn.grid(
+            row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
+        )
+        
+        self.task_delete_btn = ttk.Button(
             parent,
             text="🗑 Delete Selected",
             style="Delete.TButton",
+            command=self.delete_task,
             state="disabled",
-        ).grid(row=7, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew")
+        )
+        self.task_delete_btn.grid(
+            row=7, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew"
+        )
 
     def _build_update_assignments(self, parent):
             parent.columnconfigure(0, weight=0, minsize=110)
@@ -1295,7 +1303,7 @@ class AshscomGUI:
                         lambda e: (self.refresh_table_view(), self._clear_combo_highlight(e)),
                     )
     
-            ttk.Label(parent, text="Task Name:").grid(
+            ttk.Label(parent, text="Task:").grid(
                 row=1, column=0, padx=10, pady=row_pady, sticky="w"
             )
             self.update_assignment_task_entry = ModernDropdown(
@@ -1308,40 +1316,61 @@ class AshscomGUI:
                 row=1, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
-            ttk.Label(parent, text="Committee:").grid(
+            ttk.Label(parent, text="Member:").grid(
                 row=2, column=0, padx=10, pady=row_pady, sticky="w"
             )
-            self.update_assignment_committee_combo = ModernDropdown(
+            self.update_assignment_member_combo = ModernDropdown(
                 parent, width=field_width, state="readonly"
             )
-            self.update_assignment_committee_combo["values"] = [
-                name for (_id, name) in self.committees_list
+            self.update_assignment_member_combo["values"] = [
+                name for (_id, name) in self.members_list
             ]
-            self.update_assignment_committee_combo.grid(
+            self.update_assignment_member_combo.grid(
                 row=2, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
-            ttk.Label(parent, text="Due Date:").grid(
+            ttk.Label(parent, text="Date Assigned:").grid(
                 row=3, column=0, padx=10, pady=row_pady, sticky="w"
             )
-            self.update_assignment_due_date_entry = ttk.Entry(parent, width=field_width)
-            self.update_assignment_due_date_entry.grid(
+            self.update_assignment_date_entry = ttk.Entry(parent, width=field_width)
+            self.update_assignment_date_entry.grid(
                 row=3, column=1, padx=10, pady=row_pady, sticky="ew"
             )
+
+            ttk.Label(parent, text="Status:").grid(
+                row=4, column=0, padx=10, pady=row_pady, sticky="w"
+            )
+            self.update_assignment_status_combo = ModernDropdown(
+                parent,
+                width=field_width,
+                state="readonly",
+                values=["Pending", "In Progress", "Completed", "Cancelled"],
+            )
+            self.update_assignment_status_combo.grid(
+                row=4, column=1, padx=10, pady=row_pady, sticky="ew"
+            )
     
-            ttk.Button(
+            self.assignment_update_btn = ttk.Button(
                 parent,
                 text="🔼 Update Selected",
                 style="Update.TButton",
+                command=self.update_assignment,
                 state="disabled",
-            ).grid(row=4, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew")
+            )
+            self.assignment_update_btn.grid(
+                row=5, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
+            )
     
-            ttk.Button(
+            self.assignment_delete_btn = ttk.Button(
                 parent,
                 text="🗑 Delete Selected",
                 style="Delete.TButton",
+                command=self.delete_assignment,
                 state="disabled",
-            ).grid(row=5, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew")
+            )
+            self.assignment_delete_btn.grid(
+                row=6, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew"
+            )
 
     def _on_update_task_selected(self):
         selected = self.tasks_tree.focus()
@@ -1357,6 +1386,9 @@ class AshscomGUI:
         self.update_task_committee_combo.set(values[2] if values[2] else "")
         self.update_task_due_date_entry.delete(0, tk.END)
         self.update_task_due_date_entry.insert(0, values[3] if values[3] else "")
+        self._selected_task_id = values[0]
+        self.task_update_btn.config(state="normal")
+        self.task_delete_btn.config(state="normal")
 
     def _on_update_assignment_selected(self):
         selected = self.assignments_tree.focus()
@@ -1368,11 +1400,15 @@ class AshscomGUI:
             return
 
         self.update_assignment_task_entry.set(values[1] if values[1] else "")
-        self.update_assignment_committee_combo.set(values[2] if values[2] else "")
-        self.update_assignment_due_date_entry.delete(0, tk.END)
-        self.update_assignment_due_date_entry.insert(
+        self.update_assignment_member_combo.set(values[2] if values[2] else "")
+        self.update_assignment_date_entry.delete(0, tk.END)
+        self.update_assignment_date_entry.insert(
             0, values[3] if values[3] else ""
         )
+        self.update_assignment_status_combo.set(values[4] if values[4] else "")
+        self._selected_assignment_id = values[0]
+        self.assignment_update_btn.config(state="normal")
+        self.assignment_delete_btn.config(state="normal")
 
     def _build_task_update_form(self, parent):
         form_frame = ttk.Frame(parent)
@@ -1642,9 +1678,9 @@ class AshscomGUI:
             messagebox.showwarning("Selection Error", "Please select a task to update.")
             return
 
-        task_name = self.task_update_name_entry.get().strip()
-        committee_name = self.task_update_committee_combo.get()
-        due_date = self.task_update_due_date_entry.get().strip()
+        task_name = self.update_task_name_entry.get().strip()
+        committee_name = self.update_task_committee_combo.get()
+        due_date = self.update_task_due_date_entry.get().strip()
         committee_id = next(
             (cid for cid, name in self.committees_list if name == committee_name),
             None,
@@ -1677,6 +1713,8 @@ class AshscomGUI:
             self.load_tasks()
             self._load_tasks_for_assignment()
             self.load_assignments()
+            self.task_update_btn.config(state="disabled")
+            self.task_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Task updated successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to update task: {e}")
@@ -1688,10 +1726,10 @@ class AshscomGUI:
             )
             return
 
-        task_name = self.assignment_update_task_combo.get()
-        member_name = self.assignment_update_member_combo.get()
-        date_assigned = self.assignment_update_date_entry.get().strip()
-        status = self.assignment_update_status_combo.get()
+        task_name = self.update_assignment_task_entry.get()
+        member_name = self.update_assignment_member_combo.get()
+        date_assigned = self.update_assignment_date_entry.get().strip()
+        status = self.update_assignment_status_combo.get()
         task_id = next(
             (tid for tid, name in self.tasks_list if name == task_name), None
         )
@@ -1732,6 +1770,8 @@ class AshscomGUI:
             self.connection.commit()
             cursor.close()
             self.load_assignments()
+            self.assignment_update_btn.config(state="disabled")
+            self.assignment_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Assignment updated successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to update assignment: {e}")
@@ -1754,9 +1794,11 @@ class AshscomGUI:
             cursor.close()
             self.load_tasks()
             self._load_tasks_for_assignment()
-            self.task_update_name_entry.delete(0, tk.END)
-            self.task_update_committee_combo.set("")
-            self.task_update_due_date_entry.delete(0, tk.END)
+            self.update_task_name_entry.delete(0, tk.END)
+            self.update_task_committee_combo.set("")
+            self.update_task_due_date_entry.delete(0, tk.END)
+            self.task_update_btn.config(state="disabled")
+            self.task_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Task deleted successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to delete task: {e}")
@@ -1783,10 +1825,12 @@ class AshscomGUI:
             self.connection.commit()
             cursor.close()
             self.load_assignments()
-            self.assignment_update_task_combo.set("")
-            self.assignment_update_member_combo.set("")
-            self.assignment_update_date_entry.delete(0, tk.END)
-            self.assignment_update_status_combo.set("")
+            self.update_assignment_task_entry.set("")
+            self.update_assignment_member_combo.set("")
+            self.update_assignment_date_entry.delete(0, tk.END)
+            self.update_assignment_status_combo.set("")
+            self.assignment_update_btn.config(state="disabled")
+            self.assignment_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Assignment deleted successfully.")
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to delete assignment: {e}")
@@ -1804,6 +1848,10 @@ class AshscomGUI:
 
             self._tasks_rows = rows
             self.refresh_task_table()
+            if hasattr(self, "update_assignment_task_entry"):
+                self.update_assignment_task_entry["values"] = [
+                    name for (_id, name, _committee, _due_date) in rows
+                ]
             if hasattr(self, "assignment_update_task_combo"):
                 self.assignment_update_task_combo["values"] = [
                     name for (_id, name, _committee, _due_date) in rows
@@ -2244,6 +2292,8 @@ class AshscomGUI:
                 self.assign_member_combo.current(0)
             if hasattr(self, "assignment_update_member_combo"):
                 self.assignment_update_member_combo["values"] = member_names
+            if hasattr(self, "update_assignment_member_combo"):
+                self.update_assignment_member_combo["values"] = member_names
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load members: {e}")
 

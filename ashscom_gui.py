@@ -1135,6 +1135,9 @@ class AshscomGUI:
         task_management_frame = ttk.LabelFrame(container, text="Task Management")
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
         self.tasks_tree = self._build_task_tree(task_management_frame)
+        self.tasks_tree.bind(
+            "<<TreeviewSelect>>", lambda e: self._on_update_task_selected()
+        )
         self.load_tasks()
 
         assignment_management_frame = ttk.LabelFrame(
@@ -1145,6 +1148,9 @@ class AshscomGUI:
         )
         self.assignments_tree = self._build_assignment_tree(
             assignment_management_frame
+        )
+        self.assignments_tree.bind(
+            "<<TreeviewSelect>>", lambda e: self._on_update_assignment_selected()
         )
         self.load_assignments()
 
@@ -1200,27 +1206,29 @@ class AshscomGUI:
         ttk.Label(parent, text="Task Name:").grid(
             row=2, column=0, padx=10, pady=row_pady, sticky="w"
         )
-        ttk.Entry(parent, width=field_width).grid(
+        self.update_task_name_entry = ttk.Entry(parent, width=field_width)
+        self.update_task_name_entry.grid(
             row=2, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
         ttk.Label(parent, text="Committee:").grid(
             row=3, column=0, padx=10, pady=row_pady, sticky="w"
         )
-        committee_combo = ModernDropdown(
+        self.update_task_committee_combo = ModernDropdown(
             parent, width=field_width, state="readonly"
         )
-        committee_combo["values"] = [
+        self.update_task_committee_combo["values"] = [
             name for (_id, name) in self.committees_list
         ]
-        committee_combo.grid(
+        self.update_task_committee_combo.grid(
             row=3, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
         ttk.Label(parent, text="Due Date:").grid(
             row=4, column=0, padx=10, pady=row_pady, sticky="w"
         )
-        ttk.Entry(parent, width=field_width).grid(
+        self.update_task_due_date_entry = ttk.Entry(parent, width=field_width)
+        self.update_task_due_date_entry.grid(
             row=4, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
@@ -1290,27 +1298,34 @@ class AshscomGUI:
             ttk.Label(parent, text="Task Name:").grid(
                 row=1, column=0, padx=10, pady=row_pady, sticky="w"
             )
-            ttk.Entry(parent, width=field_width).grid(
+            self.update_assignment_task_entry = ModernDropdown(
+                parent, width=field_width, state="readonly"
+            )
+            self.update_assignment_task_entry["values"] = [
+                name for (_id, name) in self.tasks_list
+            ]
+            self.update_assignment_task_entry.grid(
                 row=1, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
             ttk.Label(parent, text="Committee:").grid(
                 row=2, column=0, padx=10, pady=row_pady, sticky="w"
             )
-            committee_combo = ModernDropdown(
+            self.update_assignment_committee_combo = ModernDropdown(
                 parent, width=field_width, state="readonly"
             )
-            committee_combo["values"] = [
+            self.update_assignment_committee_combo["values"] = [
                 name for (_id, name) in self.committees_list
             ]
-            committee_combo.grid(
+            self.update_assignment_committee_combo.grid(
                 row=2, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
             ttk.Label(parent, text="Due Date:").grid(
                 row=3, column=0, padx=10, pady=row_pady, sticky="w"
             )
-            ttk.Entry(parent, width=field_width).grid(
+            self.update_assignment_due_date_entry = ttk.Entry(parent, width=field_width)
+            self.update_assignment_due_date_entry.grid(
                 row=3, column=1, padx=10, pady=row_pady, sticky="ew"
             )
     
@@ -1327,6 +1342,37 @@ class AshscomGUI:
                 style="Delete.TButton",
                 state="disabled",
             ).grid(row=5, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew")
+
+    def _on_update_task_selected(self):
+        selected = self.tasks_tree.focus()
+        if not selected:
+            return
+
+        values = self.tasks_tree.item(selected, "values")
+        if not values:
+            return
+
+        self.update_task_name_entry.delete(0, tk.END)
+        self.update_task_name_entry.insert(0, values[1] if values[1] else "")
+        self.update_task_committee_combo.set(values[2] if values[2] else "")
+        self.update_task_due_date_entry.delete(0, tk.END)
+        self.update_task_due_date_entry.insert(0, values[3] if values[3] else "")
+
+    def _on_update_assignment_selected(self):
+        selected = self.assignments_tree.focus()
+        if not selected:
+            return
+
+        values = self.assignments_tree.item(selected, "values")
+        if not values:
+            return
+
+        self.update_assignment_task_entry.set(values[1] if values[1] else "")
+        self.update_assignment_committee_combo.set(values[2] if values[2] else "")
+        self.update_assignment_due_date_entry.delete(0, tk.END)
+        self.update_assignment_due_date_entry.insert(
+            0, values[3] if values[3] else ""
+        )
 
     def _build_task_update_form(self, parent):
         form_frame = ttk.Frame(parent)

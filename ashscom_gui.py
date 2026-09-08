@@ -1118,11 +1118,11 @@ class AshscomGUI:
         container.rowconfigure(0, weight=1, uniform="task_sections")
         container.rowconfigure(1, weight=1, uniform="task_sections")
 
-        update_tasks_assignments = ttk.LabelFrame(container, text="Update Tasks/Assignments")
+        update_tasks_assignments = ttk.LabelFrame(container, text="Update Tasks")
         update_tasks_assignments.grid(
             row=0, column=1, rowspan=2, sticky="nw", padx=(80, 0), pady=0
         )
-        self._build_update_tasks_assignments(update_tasks_assignments)
+        self._build_update_tasks(update_tasks_assignments)
 
         task_management_frame = ttk.LabelFrame(container, text="Task Management")
         task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
@@ -1140,7 +1140,7 @@ class AshscomGUI:
         )
         self.load_assignments()
 
-    def _build_update_tasks_assignments(self, parent):
+    def _build_update_tasks(self, parent):
         parent.columnconfigure(0, weight=0, minsize=110)
         parent.columnconfigure(1, weight=1)
         field_width = 22
@@ -1151,7 +1151,7 @@ class AshscomGUI:
         view_row.columnconfigure(0, weight=0)
         view_row.columnconfigure(1, weight=1)
 
-        # Search bar for filtering tasks/assignments
+        # Search bar for filtering tasks
         search_wrap = tk.Frame(view_row, bg="#7ED985", bd=0)
         search_wrap.pack(side="left", fill="x", expand=True)
         

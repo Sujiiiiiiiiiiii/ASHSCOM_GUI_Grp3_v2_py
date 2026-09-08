@@ -1099,10 +1099,10 @@ class AshscomGUI:
         )
         assignment_management_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
 
-        # Placeholder label
-        ttk.Label(assignment_management_frame, text="Placeholder").pack(
-            expand=True, padx=20, pady=20
+        self.assignments_tree = self._build_assignment_tree(
+            assignment_management_frame
         )
+        self.load_assignments()
 
     def load_students(self):
         try:
@@ -1132,6 +1132,75 @@ class AshscomGUI:
             self.refresh_table_view()
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to load students: {e}")
+
+    def _build_assignment_tree(self, parent):
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(fill="both", expand=True, padx=0, pady=0)
+
+        tree_scroll_y = ttk.Scrollbar(tree_frame)
+        tree_scroll_y.pack(side="right", fill="y")
+        tree_scroll_x = ttk.Scrollbar(tree_frame, orient="horizontal")
+        tree_scroll_x.pack(side="bottom", fill="x")
+
+        tree = ttk.Treeview(
+            tree_frame,
+            yscrollcommand=tree_scroll_y.set,
+            xscrollcommand=tree_scroll_x.set,
+            selectmode="browse",
+        )
+        tree.pack(fill="both", expand=True)
+        tree_scroll_y.config(command=tree.yview)
+        tree_scroll_x.config(command=tree.xview)
+
+        tree["columns"] = (
+            "id",
+            "task_name",
+            "assigned_to",
+            "date_assigned",
+            "status",
+        )
+        tree.column("#0", width=0, stretch=tk.NO)
+        tree.column("id", width=60, anchor=tk.CENTER, stretch=True)
+        tree.column("task_name", width=260, anchor=tk.W, stretch=True)
+        tree.column("assigned_to", width=220, anchor=tk.W, stretch=True)
+        tree.column("date_assigned", width=140, anchor=tk.CENTER, stretch=True)
+        tree.column("status", width=120, anchor=tk.CENTER, stretch=True)
+
+        tree.heading("id", text="ID", anchor=tk.CENTER)
+        tree.heading("task_name", text="Task Name", anchor=tk.CENTER)
+        tree.heading("assigned_to", text="Assigned To", anchor=tk.CENTER)
+        tree.heading("date_assigned", text="Date Assigned", anchor=tk.CENTER)
+        tree.heading("status", text="Status", anchor=tk.CENTER)
+
+        tree.tag_configure("evenrow", background="#F3FFF4")
+        tree.tag_configure("oddrow", background="#FFFFFF")
+        return tree
+
+    def load_assignments(self):
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT a.AssignmentID, t.TaskName, s.StudentName,
+                       a.DateAssigned, a.Status
+                FROM Assignment a
+                JOIN Task t ON a.TaskID = t.TaskID
+                JOIN Member m ON a.MemberID = m.MemberID
+                JOIN Student s ON m.StudentID = s.StudentID
+                ORDER BY a.AssignmentID
+            """)
+            rows = cursor.fetchall()
+            cursor.close()
+
+            for item in self.assignments_tree.get_children():
+                self.assignments_tree.delete(item)
+
+            for index, row in enumerate(rows):
+                tag = "evenrow" if index % 2 == 0 else "oddrow"
+                self.assignments_tree.insert(
+                    "", tk.END, values=row, tags=(tag,)
+                )
+        except Error as e:
+            messagebox.showerror("Database Error", f"Failed to load assignments: {e}")
 
     def load_tasks(self):
         try:
@@ -1642,6 +1711,7 @@ class AshscomGUI:
             # Refresh dropdowns
             self._load_tasks_for_assignment()
             self._load_members_for_assignment()
+            self.load_assignments()
 
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to assign task: {e}")

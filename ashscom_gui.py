@@ -325,6 +325,7 @@ class ModernDropdown(tk.Frame):
 
 class AshscomGUI:
     STUDENT_PASSKEY = "ashscom2026"
+    ACTION_PIN = "1835"
 
     def __init__(self, root):
         self.root = root
@@ -432,6 +433,35 @@ class AshscomGUI:
 
         logo2_img = Image.open("ashscom.png").resize((90, 90))
         self.logo2 = ImageTk.PhotoImage(logo2_img)
+
+        # Modernized scrollbars
+        style.configure(
+            "Vertical.TScrollbar",
+            background="#B0C4DE",
+            troughcolor="#F4F6F9",
+            bordercolor="#F4F6F9",
+            arrowcolor="#003366",
+            relief="flat",
+            gripcount=0,
+        )
+        style.map(
+            "Vertical.TScrollbar",
+            background=[("active", "#198754"), ("pressed", "#157347")],
+        )
+
+        style.configure(
+            "Horizontal.TScrollbar",
+            background="#B0C4DE",
+            troughcolor="#F4F6F9",
+            bordercolor="#F4F6F9",
+            arrowcolor="#003366",
+            relief="flat",
+            gripcount=0,
+        )
+        style.map(
+            "Horizontal.TScrollbar",
+            background=[("active", "#198754"), ("pressed", "#157347")],
+        )
 
         def redraw_header(event):
             width = event.width
@@ -569,6 +599,66 @@ class AshscomGUI:
 
         show_page("students")
 
+    def _attach_date_picker(self, entry):
+        import calendar as cal_module
+        from datetime import date
+
+        def open_picker():
+            popup = tk.Toplevel(self.root)
+            popup.title("Select Date")
+            popup.resizable(False, False)
+            popup.transient(self.root)
+            popup.grab_set()
+
+            state = {"year": date.today().year, "month": date.today().month}
+            body = tk.Frame(popup, bg="#F7FFF9")
+            body.pack(padx=10, pady=10)
+
+            header = tk.Frame(body, bg="#F7FFF9")
+            header.pack(fill="x")
+            label = tk.Label(header, text="", font=("Segoe UI", 10, "bold"), bg="#F7FFF9")
+            label.pack(side="left", expand=True)
+
+            grid_frame = tk.Frame(body, bg="#F7FFF9")
+            grid_frame.pack()
+
+            def render():
+                for w in grid_frame.winfo_children():
+                    w.destroy()
+                label.config(text=f"{cal_module.month_name[state['month']]} {state['year']}")
+                for i, d in enumerate(["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]):
+                    tk.Label(grid_frame, text=d, width=4, bg="#F7FFF9", font=("Segoe UI", 8, "bold")).grid(row=0, column=i)
+                for r, week in enumerate(cal_module.monthcalendar(state["year"], state["month"]), start=1):
+                    for c, day in enumerate(week):
+                        if day == 0:
+                            continue
+                        def pick(d=day):
+                            entry.delete(0, tk.END)
+                            entry.insert(0, f"{state['year']:04d}-{state['month']:02d}-{d:02d}")
+                            popup.destroy()
+                        tk.Button(grid_frame, text=str(day), width=4, relief="flat",
+                                  command=pick).grid(row=r, column=c, padx=1, pady=1)
+
+            def prev_month():
+                state["month"] -= 1
+                if state["month"] < 1:
+                    state["month"] = 12
+                    state["year"] -= 1
+                render()
+
+            def next_month():
+                state["month"] += 1
+                if state["month"] > 12:
+                    state["month"] = 1
+                    state["year"] += 1
+                render()
+
+            tk.Button(header, text="<", command=prev_month, relief="flat").pack(side="left")
+            tk.Button(header, text=">", command=next_month, relief="flat").pack(side="right")
+            render()
+
+        return open_picker
+
     # -----------------------------------------------------------------
     # Cascading Grade -> Section helper (alphabetical + no highlight)
     # -----------------------------------------------------------------
@@ -652,8 +742,13 @@ class AshscomGUI:
         ttk.Label(form_frame, text="Addu Email:").grid(
             row=3, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
-        self.edit_email_entry = ttk.Entry(form_frame, width=FIELD_WIDTH)
-        self.edit_email_entry.grid(row=3, column=1, padx=10, pady=ROW_PADY, sticky="ew")
+        email_row = ttk.Frame(form_frame)
+        email_row.grid(row=3, column=1, padx=10, pady=ROW_PADY, sticky="ew")
+        self.edit_email_entry = ttk.Entry(email_row, width=FIELD_WIDTH - 12)
+        self.edit_email_entry.pack(side="left")
+        ttk.Label(email_row, text="@addu.edu.ph").pack(side="left")
+
+
 
         ttk.Label(form_frame, text="Committee:").grid(
             row=4, column=0, padx=10, pady=ROW_PADY, sticky="w"
@@ -830,33 +925,18 @@ class AshscomGUI:
             "committee",
             "role"
         )
-        form_frame = ttk.LabelFrame(parent, text="Add Task/Assignment")
-        form_frame.pack(fill="x", padx=15, pady=(0, 15))
-        form_frame.columnconfigure(0, weight=0, minsize=110)
-        form_frame.columnconfigure(1, weight=1)
-        field_width = 22
-        ttk.Label(form_frame, text="Task Name:").grid(
-            row=0, column=0, padx=10, pady=6, sticky="w"
-        )
-        self.task_name_entry = ttk.Entry(form_frame, width=field_width)
-        self.task_name_entry.grid(
-            row=0, column=1, padx=10, pady=6, sticky="ew"
-        )
+
         tree.column("#0", width=0, stretch=tk.NO)
         tree.column("id", width=50, anchor=tk.CENTER, stretch=False)
         tree.column("name", width=200, anchor=tk.W, stretch=False)
         tree.column("grade_level", width=80, anchor=tk.CENTER, stretch=False)
-        self.task_committee_combo = ModernDropdown(
-            form_frame, width=field_width, state="readonly"
-        )
-        self.task_committee_combo.grid(row=1, column=1, padx=10, pady=6, sticky="ew")
+        tree.column("section", width=100, anchor=tk.CENTER, stretch=False)
         tree.column("addu_email", width=220, anchor=tk.W, stretch=False)
         tree.column("committee", width=140, anchor=tk.CENTER, stretch=False)
         tree.column("role", width=180, anchor=tk.CENTER, stretch=False)
 
         tree.heading("id", text="ID", anchor=tk.CENTER)
-        self.task_due_date_entry = ttk.Entry(form_frame, width=field_width)
-        self.task_due_date_entry.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
+        tree.heading("name", text="Name", anchor=tk.CENTER)
         tree.heading("grade_level", text="Grade", anchor=tk.CENTER)
         tree.heading("section", text="Section", anchor=tk.CENTER)
         tree.heading("addu_email", text="Email", anchor=tk.CENTER)
@@ -957,8 +1037,11 @@ class AshscomGUI:
         ttk.Label(entry_frame, text="Addu Email:").grid(
             row=3, column=0, padx=10, pady=_PY, sticky="w"
         )
-        self.email_entry = ttk.Entry(entry_frame, width=_FW)
-        self.email_entry.grid(row=3, column=1, padx=10, pady=_PY, sticky="ew")
+        email_row = ttk.Frame(entry_frame)
+        email_row.grid(row=3, column=1, padx=10, pady=_PY, sticky="ew")
+        self.email_entry = ttk.Entry(email_row, width=_FW - 12)
+        self.email_entry.pack(side="left")
+        ttk.Label(email_row, text="@addu.edu.ph").pack(side="left")
 
         ttk.Label(entry_frame, text="Committee:").grid(
             row=4, column=0, padx=10, pady=_PY, sticky="w"
@@ -1028,8 +1111,12 @@ class AshscomGUI:
         ttk.Label(assign_tasks_frame, text="Due Date (YYYY-MM-DD):").grid(
             row=2, column=0, padx=10, pady=6, sticky="w"
         )
-        self.task_due_date_entry = ttk.Entry(assign_tasks_frame, width=_AFW)
-        self.task_due_date_entry.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
+        date_row = ttk.Frame(assign_tasks_frame)
+        date_row.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
+        self.task_due_date_entry = ttk.Entry(date_row, width=_AFW - 3)
+        self.task_due_date_entry.pack(side="left")
+        ttk.Button(date_row, text="📅", width=3,
+                   command=self._attach_date_picker(self.task_due_date_entry)).pack(side="left", padx=(4, 0))
 
         add_task_button = ttk.Button(
             assign_tasks_frame,
@@ -1069,8 +1156,12 @@ class AshscomGUI:
         ttk.Label(assign_tasks_frame, text="Date Assigned (YYYY-MM-DD):").grid(
             row=7, column=0, padx=10, pady=6, sticky="w"
         )
-        self.assign_date_entry = ttk.Entry(assign_tasks_frame, width=_AFW)
-        self.assign_date_entry.grid(row=7, column=1, padx=10, pady=6, sticky="ew")
+        date_row = ttk.Frame(assign_tasks_frame)
+        date_row.grid(row=7, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_date_entry = ttk.Entry(date_row, width=_AFW - 3)
+        self.assign_date_entry.pack(side="left")
+        ttk.Button(date_row, text="📅", width=3,
+                   command=self._attach_date_picker(self.assign_date_entry)).pack(side="left", padx=(4, 0))
 
         ttk.Label(assign_tasks_frame, text="Status:").grid(
             row=8, column=0, padx=10, pady=6, sticky="w"
@@ -1111,273 +1202,163 @@ class AshscomGUI:
         settings_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["task/assignment"] = settings_frame
 
-        container = ttk.Frame(settings_frame)
-        container.pack(fill="both", expand=True, padx=15, pady=15)
-        container.columnconfigure(0, weight=0, minsize=700)
-        container.columnconfigure(1, weight=1)
-        container.rowconfigure(0, weight=1, uniform="task_sections")
-        container.rowconfigure(1, weight=1, uniform="task_sections")
-        container.rowconfigure(2, weight=0)
+        sub_notebook = ttk.Notebook(settings_frame)
+        sub_notebook.pack(fill="both", expand=True, padx=15, pady=15)
 
-        update_tasks_frame = ttk.LabelFrame(container, text="Update Tasks")
-        update_tasks_frame.grid(
-            row=0, column=1, sticky="nw", padx=(80, 0), pady=(0, 8)
-        )
-        self._build_update_tasks(update_tasks_frame)
+        tasks_page = ttk.Frame(sub_notebook)
+        assignments_page = ttk.Frame(sub_notebook)
+        sub_notebook.add(tasks_page, text="Tasks")
+        sub_notebook.add(assignments_page, text="Assignments")
 
-        update_assignments_frame = ttk.LabelFrame(
-            container, text="Update Assignment"
-        )
-        update_assignments_frame.grid(
-            row=1, column=1, sticky="nw", padx=(80, 0), pady=(8, 0)
-        )
-        self._build_update_assignments(update_assignments_frame)
+        # --- TASKS SUBTAB ---
+        tasks_page.columnconfigure(0, weight=1)
+        tasks_page.rowconfigure(1, weight=1)
 
-        task_management_frame = ttk.LabelFrame(container, text="Task Management")
-        task_management_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
-        self.tasks_tree = self._build_task_tree(task_management_frame)
-        self.tasks_tree.bind(
-            "<<TreeviewSelect>>", lambda e: self._on_update_task_selected()
-        )
+        task_top_row = ttk.Frame(tasks_page)
+        task_top_row.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+
+        search_wrap = tk.Frame(task_top_row, bg="#7ED985", bd=0)
+        search_wrap.pack(side="left", fill="x", expand=True)
+        search_inner = tk.Frame(search_wrap, bg="white")
+        search_inner.pack(fill="both", expand=True, padx=1, pady=1)
+        tk.Label(search_inner, text="🔍", bg="white", fg="#6B6B6B", font=("Segoe UI", 10)).pack(side="left", padx=(10, 4), pady=6)
+        self.task_search_var = tk.StringVar()
+        tk.Entry(search_inner, textvariable=self.task_search_var, bg="white", fg="#0F1A0F",
+                  relief="flat", font=("Segoe UI", 10), bd=0).pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
+        self.task_search_var.trace_add("write", lambda *args: self.refresh_task_table())
+
+        ttk.Label(task_top_row, text="Show Tasks:", font=("Segoe UI", 10, "bold")).pack(side="left", padx=(12, 5))
+        self.task_committee_filter = ModernDropdown(task_top_row, width=18, state="readonly")
+        self.task_committee_filter["values"] = ["All Committees"]
+        self.task_committee_filter.set("All Committees")
+        self.task_committee_filter.pack(side="left")
+        self.task_committee_filter.bind("<<ComboboxSelected>>", lambda e: (self.refresh_task_table(), self._clear_combo_highlight(e)))
+
+        task_body = ttk.Frame(tasks_page)
+        task_body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        task_body.columnconfigure(0, weight=1)
+
+        task_tree_frame = ttk.LabelFrame(task_body, text="Task List")
+        task_tree_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        self.tasks_tree = self._build_task_tree(task_tree_frame)
+        self.tasks_tree.bind("<<TreeviewSelect>>", lambda e: self._on_update_task_selected())
+
+        task_form_frame = ttk.LabelFrame(task_body, text="Update Task")
+        task_form_frame.grid(row=0, column=1, sticky="ns", padx=(5, 0))
+        self._build_update_tasks(task_form_frame)
+
+        # --- ASSIGNMENTS SUBTAB ---
+        assignments_page.columnconfigure(0, weight=1)
+        assignments_page.rowconfigure(1, weight=1)
+
+        assign_top_row = ttk.Frame(assignments_page)
+        assign_top_row.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+
+        a_search_wrap = tk.Frame(assign_top_row, bg="#7ED985", bd=0)
+        a_search_wrap.pack(side="left", fill="x", expand=True)
+        a_search_inner = tk.Frame(a_search_wrap, bg="white")
+        a_search_inner.pack(fill="both", expand=True, padx=1, pady=1)
+        tk.Label(a_search_inner, text="🔍", bg="white", fg="#6B6B6B", font=("Segoe UI", 10)).pack(side="left", padx=(10, 4), pady=6)
+        self.assignment_search_var = tk.StringVar()
+        tk.Entry(a_search_inner, textvariable=self.assignment_search_var, bg="white", fg="#0F1A0F",
+                  relief="flat", font=("Segoe UI", 10), bd=0).pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
+        self.assignment_search_var.trace_add("write", lambda *args: self.refresh_assignment_table())
+
+        assign_body = ttk.Frame(assignments_page)
+        assign_body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        assign_body.columnconfigure(0, weight=1)
+
+        assign_tree_frame = ttk.LabelFrame(assign_body, text="Assignment List")
+        assign_tree_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        self.assignments_tree = self._build_assignment_tree(assign_tree_frame)
+        self.assignments_tree.bind("<<TreeviewSelect>>", lambda e: self._on_update_assignment_selected())
+
+        assign_form_frame = ttk.LabelFrame(assign_body, text="Update Assignment")
+        assign_form_frame.grid(row=0, column=1, sticky="ns", padx=(5, 0))
+        self._build_update_assignments(assign_form_frame)
+
         self.load_tasks()
-
-        assignment_management_frame = ttk.LabelFrame(
-            container, text="Assignment Management"
-        )
-        assignment_management_frame.grid(
-            row=1, column=0, sticky="nsew", pady=(5, 0)
-        )
-        self.assignments_tree = self._build_assignment_tree(
-            assignment_management_frame
-        )
-        self.assignments_tree.bind(
-            "<<TreeviewSelect>>", lambda e: self._on_update_assignment_selected()
-        )
         self.load_assignments()
 
     def _build_update_tasks(self, parent):
         parent.columnconfigure(0, weight=0, minsize=110)
         parent.columnconfigure(1, weight=1)
-        field_width = 22
+        field_width = 20
         row_pady = 6
 
-        view_row = ttk.Frame(parent)
-        view_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 4))
-        view_row.columnconfigure(0, weight=0)
-        view_row.columnconfigure(1, weight=1)
-
-        # Search bar for filtering tasks
-        search_wrap = tk.Frame(view_row, bg="#7ED985", bd=0)
-        search_wrap.pack(side="left", fill="x", expand=True)
-        
-        search_inner = tk.Frame(search_wrap, bg="white")
-        search_inner.pack(fill="both", expand=True, padx=1, pady=1)
-
-        tk.Label(search_inner, text="🔍", bg="white", fg="#6B6B6B",
-        font=("Segoe UI", 10)).pack(side="left", padx=(10, 4), pady=6)
-        
-        self.search_var = tk.StringVar()
-        search_entry = tk.Entry(search_inner, textvariable=self.search_var,
-        bg="white", fg="#0F1A0F", relief="flat",
-        font=("Segoe UI", 10), bd=0)
-        search_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
-        self.search_var.trace_add("write", lambda *args: self.refresh_table_view())
-
-        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(
-                    side="left", padx=(0, 5)
-                )
-        self.view_combo = ModernDropdown(
-                    view_row,
-                    width=20,
-                    state="readonly",
-                    values=[
-                        "All Students",
-                        "ASHSCOM Members",
-                        "Election Candidates",
-                        "Committee Heads",
-                    ],
-                )
-        self.view_combo.set("All Students")
-        self.view_combo.pack(side="left", padx=(0, 12))
-        self.view_combo.bind(
-                    "<<ComboboxSelected>>",
-                    lambda e: (self.refresh_table_view(), self._clear_combo_highlight(e)),
-                )
-
-        ttk.Label(parent, text="Task Name:").grid(
-            row=2, column=0, padx=10, pady=row_pady, sticky="w"
-        )
+        ttk.Label(parent, text="Task Name:").grid(row=0, column=0, padx=10, pady=row_pady, sticky="w")
         self.update_task_name_entry = ttk.Entry(parent, width=field_width)
-        self.update_task_name_entry.grid(
-            row=2, column=1, padx=10, pady=row_pady, sticky="ew"
-        )
+        self.update_task_name_entry.grid(row=0, column=1, padx=10, pady=row_pady, sticky="ew")
 
-        ttk.Label(parent, text="Committee:").grid(
-            row=3, column=0, padx=10, pady=row_pady, sticky="w"
-        )
-        self.update_task_committee_combo = ModernDropdown(
-            parent, width=field_width, state="readonly"
-        )
-        self.update_task_committee_combo["values"] = [
-            name for (_id, name) in self.committees_list
-        ]
-        self.update_task_committee_combo.grid(
-            row=3, column=1, padx=10, pady=row_pady, sticky="ew"
-        )
+        ttk.Label(parent, text="Committee:").grid(row=1, column=0, padx=10, pady=row_pady, sticky="w")
+        self.update_task_committee_combo = ModernDropdown(parent, width=field_width, state="readonly")
+        self.update_task_committee_combo["values"] = [name for (_id, name) in self.committees_list]
+        self.update_task_committee_combo.grid(row=1, column=1, padx=10, pady=row_pady, sticky="ew")
 
-        ttk.Label(parent, text="Due Date:").grid(
-            row=4, column=0, padx=10, pady=row_pady, sticky="w"
-        )
-        self.update_task_due_date_entry = ttk.Entry(parent, width=field_width)
-        self.update_task_due_date_entry.grid(
-            row=4, column=1, padx=10, pady=row_pady, sticky="ew"
-        )
+        ttk.Label(parent, text="Due Date:").grid(row=2, column=0, padx=10, pady=row_pady, sticky="w")
+        date_row = ttk.Frame(parent)
+        date_row.grid(row=2, column=1, padx=10, pady=row_pady, sticky="ew")
+        self.update_task_due_date_entry = ttk.Entry(date_row, width=field_width - 3)
+        self.update_task_due_date_entry.pack(side="left")
+        ttk.Button(date_row, text="📅", width=3,
+                   command=self._attach_date_picker(self.update_task_due_date_entry)).pack(side="left", padx=(4, 0))
 
         task_button_row = ttk.Frame(parent)
-        task_button_row.grid(
-            row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
-        )
+        task_button_row.grid(row=3, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew")
         task_button_row.columnconfigure(0, weight=1)
         task_button_row.columnconfigure(1, weight=1)
 
-        self.task_update_btn = ttk.Button(
-            task_button_row,
-            text="🔼 Update Task",
-            style="Update.TButton",
-            command=self.update_task,
-            state="disabled",
-        )
+        self.task_update_btn = ttk.Button(task_button_row, text="🔼 Update Task", style="Update.TButton",
+                                           command=self.update_task, state="disabled")
         self.task_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
 
-        self.task_delete_btn = ttk.Button(
-            task_button_row,
-            text="🗑 Delete Task",
-            style="Delete.TButton",
-            command=self.delete_task,
-            state="disabled",
-        )
+        self.task_delete_btn = ttk.Button(task_button_row, text="🗑 Delete Task", style="Delete.TButton",
+                                           command=self.delete_task, state="disabled")
         self.task_delete_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
 
     def _build_update_assignments(self, parent):
-            parent.columnconfigure(0, weight=0, minsize=110)
-            parent.columnconfigure(1, weight=1)
-            field_width = 22
-            row_pady = 4
-    
-            view_row = ttk.Frame(parent)
-            view_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 4))
-            view_row.columnconfigure(0, weight=0)
-            view_row.columnconfigure(1, weight=1)
-    
-            # Search bar for filtering tasks
-            search_wrap = tk.Frame(view_row, bg="#7ED985", bd=0)
-            search_wrap.pack(side="left", fill="x", expand=True)
-            
-            search_inner = tk.Frame(search_wrap, bg="white")
-            search_inner.pack(fill="both", expand=True, padx=1, pady=1)
-    
-            tk.Label(search_inner, text="🔍", bg="white", fg="#6B6B6B",
-            font=("Segoe UI", 10)).pack(side="left", padx=(10, 4), pady=6)
-            
-            self.search_var = tk.StringVar()
-            search_entry = tk.Entry(search_inner, textvariable=self.search_var,
-            bg="white", fg="#0F1A0F", relief="flat",
-            font=("Segoe UI", 10), bd=0)
-            search_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 10))
-            self.search_var.trace_add("write", lambda *args: self.refresh_table_view())
-    
-            ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(
-                        side="left", padx=(0, 5)
-                    )
-            self.view_combo = ModernDropdown(
-                        view_row,
-                        width=20,
-                        state="readonly",
-                        values=[
-                            "All Students",
-                            "ASHSCOM Members",
-                            "Election Candidates",
-                            "Committee Heads",
-                        ],
-                    )
-            self.view_combo.set("All Students")
-            self.view_combo.pack(side="left", padx=(0, 12))
-            self.view_combo.bind(
-                        "<<ComboboxSelected>>",
-                        lambda e: (self.refresh_table_view(), self._clear_combo_highlight(e)),
-                    )
-    
-            ttk.Label(parent, text="Task:").grid(
-                row=1, column=0, padx=10, pady=row_pady, sticky="w"
-            )
-            self.update_assignment_task_entry = ModernDropdown(
-                parent, width=field_width, state="readonly"
-            )
-            self.update_assignment_task_entry["values"] = [
-                name for (_id, name) in self.tasks_list
-            ]
-            self.update_assignment_task_entry.grid(
-                row=1, column=1, padx=10, pady=row_pady, sticky="ew"
-            )
-    
-            ttk.Label(parent, text="Member:").grid(
-                row=2, column=0, padx=10, pady=row_pady, sticky="w"
-            )
-            self.update_assignment_member_combo = ModernDropdown(
-                parent, width=field_width, state="readonly"
-            )
-            self.update_assignment_member_combo["values"] = [
-                name for (_id, name) in self.members_list
-            ]
-            self.update_assignment_member_combo.grid(
-                row=2, column=1, padx=10, pady=row_pady, sticky="ew"
-            )
-    
-            ttk.Label(parent, text="Date Assigned:").grid(
-                row=3, column=0, padx=10, pady=row_pady, sticky="w"
-            )
-            self.update_assignment_date_entry = ttk.Entry(parent, width=field_width)
-            self.update_assignment_date_entry.grid(
-                row=3, column=1, padx=10, pady=row_pady, sticky="ew"
-            )
+        parent.columnconfigure(0, weight=0, minsize=110)
+        parent.columnconfigure(1, weight=1)
+        field_width = 20
+        row_pady = 6
 
-            ttk.Label(parent, text="Status:").grid(
-                row=4, column=0, padx=10, pady=row_pady, sticky="w"
-            )
-            self.update_assignment_status_combo = ModernDropdown(
-                parent,
-                width=field_width,
-                state="readonly",
-                values=["Pending", "In Progress", "Completed", "Cancelled"],
-            )
-            self.update_assignment_status_combo.grid(
-                row=4, column=1, padx=10, pady=row_pady, sticky="ew"
-            )
-    
-            assignment_button_row = ttk.Frame(parent)
-            assignment_button_row.grid(
-                row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
-            )
-            assignment_button_row.columnconfigure(0, weight=1)
-            assignment_button_row.columnconfigure(1, weight=1)
-    
-            self.assignment_update_btn = ttk.Button(
-                assignment_button_row,
-                text="🔼 Update Assignment",
-                style="Update.TButton",
-                command=self.update_assignment,
-                state="disabled",
-            )
-            self.assignment_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
-    
-            self.assignment_delete_btn = ttk.Button(
-                assignment_button_row,
-                text="🗑 Delete Assignment",
-                style="Delete.TButton",
-                command=self.delete_assignment,
-                state="disabled",
-            )
-            self.assignment_delete_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
+        ttk.Label(parent, text="Task:").grid(row=0, column=0, padx=10, pady=row_pady, sticky="w")
+        self.update_assignment_task_entry = ModernDropdown(parent, width=field_width, state="readonly")
+        self.update_assignment_task_entry["values"] = [name for (_id, name) in self.tasks_list]
+        self.update_assignment_task_entry.grid(row=0, column=1, padx=10, pady=row_pady, sticky="ew")
+
+        ttk.Label(parent, text="Member:").grid(row=1, column=0, padx=10, pady=row_pady, sticky="w")
+        self.update_assignment_member_combo = ModernDropdown(parent, width=field_width, state="readonly")
+        self.update_assignment_member_combo["values"] = [name for (_id, name) in self.members_list]
+        self.update_assignment_member_combo.grid(row=1, column=1, padx=10, pady=row_pady, sticky="ew")
+
+        ttk.Label(parent, text="Date Assigned:").grid(row=2, column=0, padx=10, pady=row_pady, sticky="w")
+        date_row = ttk.Frame(parent)
+        date_row.grid(row=2, column=1, padx=10, pady=row_pady, sticky="ew")
+        self.update_assignment_date_entry = ttk.Entry(date_row, width=field_width - 3)
+        self.update_assignment_date_entry.pack(side="left")
+        ttk.Button(date_row, text="📅", width=3,
+                   command=self._attach_date_picker(self.update_assignment_date_entry)).pack(side="left", padx=(4, 0))
+
+        ttk.Label(parent, text="Status:").grid(row=3, column=0, padx=10, pady=row_pady, sticky="w")
+        self.update_assignment_status_combo = ModernDropdown(
+            parent, width=field_width, state="readonly",
+            values=["Pending", "In Progress", "Completed", "Cancelled"],
+        )
+        self.update_assignment_status_combo.grid(row=3, column=1, padx=10, pady=row_pady, sticky="ew")
+
+        assignment_button_row = ttk.Frame(parent)
+        assignment_button_row.grid(row=4, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew")
+        assignment_button_row.columnconfigure(0, weight=1)
+        assignment_button_row.columnconfigure(1, weight=1)
+
+        self.assignment_update_btn = ttk.Button(assignment_button_row, text="🔼 Update Assignment", style="Update.TButton",
+                                                 command=self.update_assignment, state="disabled")
+        self.assignment_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
+
+        self.assignment_delete_btn = ttk.Button(assignment_button_row, text="🗑 Delete Assignment", style="Delete.TButton",
+                                                 command=self.delete_assignment, state="disabled")
+        self.assignment_delete_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
     
     def _on_update_task_selected(self):
         selected = self.tasks_tree.focus()
@@ -1854,6 +1835,9 @@ class AshscomGUI:
             cursor.close()
 
             self._tasks_rows = rows
+            if hasattr(self, "task_committee_filter"):
+                committee_names = sorted(set(r[2] for r in rows if r[2]))
+                self.task_committee_filter["values"] = ["All Committees"] + committee_names
             self.refresh_task_table()
             if hasattr(self, "update_assignment_task_entry"):
                 self.update_assignment_task_entry["values"] = [
@@ -1870,16 +1854,16 @@ class AshscomGUI:
         for item in self.tasks_tree.get_children():
             self.tasks_tree.delete(item)
 
-        query = (
-            self.task_search_var.get().strip().lower()
-            if hasattr(self, "task_search_var")
-            else ""
-        )
-        rows = [
-            row for row in getattr(self, "_tasks_rows", [])
-            if not query
-            or any(query in str(field).lower() for field in row if field is not None)
-        ]
+        rows = getattr(self, "_tasks_rows", [])
+
+        committee_filter = self.task_committee_filter.get() if hasattr(self, "task_committee_filter") else "All Committees"
+        if committee_filter and committee_filter != "All Committees":
+            rows = [r for r in rows if r[2] == committee_filter]
+
+        query = self.task_search_var.get().strip().lower() if hasattr(self, "task_search_var") else ""
+        if query:
+            rows = [row for row in rows if any(query in str(f).lower() for f in row if f is not None)]
+
         for index, row in enumerate(rows):
             tag = "evenrow" if index % 2 == 0 else "oddrow"
             self.tasks_tree.insert("", tk.END, values=row, tags=(tag,))
@@ -1925,7 +1909,7 @@ class AshscomGUI:
         name = self.name_entry.get().strip()
         grade = self.grade_entry.get().strip()
         section = self.section_entry.get().strip()
-        email = self.email_entry.get().strip()
+        email = self.email_entry.get().strip() + "@addu.edu.ph"
         committee_name = self.committee_combo.get()
         role = self.role_combo.get()
 
@@ -1946,6 +1930,9 @@ class AshscomGUI:
                 "Input Error",
                 "Please select a role for the Student. If the Student is an Election Candidate, please select the Committee and Role accordingly.",
             )
+            return
+
+        if not self._verify_pin("add this student"):
             return
 
         try:
@@ -2020,7 +2007,7 @@ class AshscomGUI:
                   font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 8))
 
         entry_var = tk.StringVar()
-        entry = ttk.Entry(content, textvariable=entry_var, width=3, show="*")
+        entry = ttk.Entry(content, textvariable=entry_var, width=30, show="*")
         entry.pack(fill="x", pady=(0, 8))
         entry.focus_set()
 
@@ -2064,6 +2051,65 @@ class AshscomGUI:
         else:
             messagebox.showerror("Access Denied", "Incorrect passkey.")
 
+    def _verify_pin(self, action_label="perform this action"):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Verify PIN")
+        dialog.configure(bg="#F7FFF9")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        dialog.update_idletasks()
+        w, h = 300, 170
+        x = (dialog.winfo_screenwidth() // 2) - (w // 2)
+        y = (dialog.winfo_screenheight() // 2) - (h // 2)
+        dialog.geometry(f"{w}x{h}+{x}+{y}")
+
+        content = tk.Frame(dialog, bg="#F7FFF9")
+        content.pack(fill="both", expand=True, padx=20, pady=15)
+
+        ttk.Label(content, text=f"Enter 4-digit PIN to {action_label}:",
+                  font=("Segoe UI", 10), wraplength=260).pack(anchor="w", pady=(0, 8))
+
+        vcmd = (dialog.register(lambda s: s.isdigit() and len(s) <= 4 or s == ""), "%P")
+
+        pin_var = tk.StringVar()
+        entry = ttk.Entry(content, textvariable=pin_var, width=10, show="*",
+                           justify="center", font=("Segoe UI", 14),
+                           validate="key", validatecommand=vcmd)
+        entry.pack(pady=(0, 15))
+        entry.focus_set()
+
+        result = {"value": None}
+
+        def confirm():
+            result["value"] = pin_var.get()
+            dialog.destroy()
+
+        def cancel():
+            dialog.destroy()
+
+        btn_row = tk.Frame(content, bg="#F7FFF9")
+        btn_row.pack()
+        ttk.Button(btn_row, text="Confirm", style="Add.TButton", command=confirm, width=10).pack(
+            side="left", padx=(0, 8)
+        )
+        ttk.Button(btn_row, text="Cancel", style="Update.TButton", command=cancel, width=10).pack(
+            side="left"
+        )
+
+        entry.bind("<Return>", lambda e: confirm())
+        dialog.wait_window()
+
+        entered = result["value"]
+        if entered is None:
+            return False
+        if entered == self.ACTION_PIN:
+            return True
+        messagebox.showerror("Access Denied", "Incorrect PIN.")
+        return False
+
+
     def on_student_select(self, tree):
         selected = tree.focus()
         if selected:
@@ -2076,7 +2122,7 @@ class AshscomGUI:
                 self.edit_section_entry["values"] = GRADE_SECTIONS.get(grade_value, [])
                 self.edit_section_entry.set(values[3] if values[3] else "")
                 self.edit_email_entry.delete(0, tk.END)
-                self.edit_email_entry.insert(0, values[4])
+                self.edit_email_entry.insert(0, values[4].replace("@addu.edu.ph", "") if values[4] else "")
                 self.edit_committee_combo.set(values[5] if values[5] else "")
                 self.edit_role_combo.set(values[6] if values[6] else "")
                 self._selected_student_id = values[0]
@@ -2097,7 +2143,7 @@ class AshscomGUI:
         name = self.edit_name_entry.get().strip()
         grade = self.edit_grade_entry.get().strip()
         section = self.edit_section_entry.get().strip()
-        email = self.edit_email_entry.get().strip()
+        email = self.edit_email_entry.get().strip() + "@addu.edu.ph"
         committee_name = self.edit_committee_combo.get()
         role = self.edit_role_combo.get()
 
@@ -2237,6 +2283,9 @@ class AshscomGUI:
             messagebox.showerror("Error", "Could not determine Committee ID.")
             return
 
+        if not self._verify_pin("add this task"):
+            return
+
         try:
             cursor = self.connection.cursor()
             cursor.execute(
@@ -2260,6 +2309,7 @@ class AshscomGUI:
             # Refresh the committee dropdown in case new committees were added
             self._load_committees_for_task()
             self.load_tasks()
+            self._load_tasks_for_assignment()
 
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to add task: {e}")
@@ -2357,6 +2407,9 @@ class AshscomGUI:
 
         if member_id is None:
             messagebox.showerror("Error", "Could not determine Member ID.")
+            return
+
+        if not self._verify_pin("assign this task"):
             return
 
         try:

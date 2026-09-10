@@ -2,8 +2,27 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from types import SimpleNamespace
 from PIL import Image, ImageTk
-from db_connect import create_connection
+import customtkinter as ctk
+import mysql.connector
 from mysql.connector import Error
+
+
+def create_connection():
+    """Open the configured ASHSCOM database connection."""
+    for password in ("root", "roots"):
+        try:
+            connection = mysql.connector.connect(
+                host="127.0.0.1",
+                user="root",
+                password=password,
+                database="ASHCOMManagement",
+            )
+            if connection.is_connected():
+                return connection
+        except Error as error:
+            if password == "roots":
+                print(f"Error while connecting to MySQL: {error}")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -323,6 +342,101 @@ class ModernDropdown(tk.Frame):
         self.config(bg=self.BORDER)
 
 
+class ModernComboBox(ctk.CTkComboBox):
+    """CTkComboBox adapter used by the existing validation and CRUD methods."""
+
+    def __init__(self, master=None, width=20, state="readonly", values=None, **kwargs):
+        self._selection_callbacks = []
+        self._placeholder = "Select an option"
+        kwargs.setdefault("height", 38)
+        kwargs.setdefault("corner_radius", 10)
+        kwargs.setdefault("border_width", 1)
+        kwargs.setdefault("border_color", "#B8CBD8")
+        kwargs.setdefault("fg_color", "#FFFFFF")
+        kwargs.setdefault("button_color", "#E6F7F1")
+        kwargs.setdefault("button_hover_color", "#C8EBDD")
+        kwargs.setdefault("dropdown_fg_color", "#FFFFFF")
+        kwargs.setdefault("dropdown_hover_color", "#E6F7F1")
+        kwargs.setdefault("text_color", "#243648")
+        kwargs["state"] = "normal" if state == "readonly" else state
+        kwargs["command"] = self._notify_selection
+        super().__init__(master, width=width * 8, values=values or [], **kwargs)
+        super().set(self._placeholder)
+
+    def _notify_selection(self, _value=None):
+        event = SimpleNamespace(widget=self)
+        for callback in list(self._selection_callbacks):
+            if callback:
+                callback(event)
+
+    def bind(self, sequence=None, func=None, add=None):
+        if sequence == "<<ComboboxSelected>>":
+            self._selection_callbacks.append(func)
+            return
+        return super().bind(sequence, func, add)
+
+    def configure(self, *args, **kwargs):
+        if "values" in kwargs:
+            kwargs["values"] = list(kwargs["values"] or [])
+        return super().configure(*args, **kwargs)
+
+    config = configure
+
+    def __setitem__(self, key, value):
+        if key == "values":
+            self.configure(values=value)
+        else:
+            self.configure(**{key: value})
+
+    def __getitem__(self, key):
+        if key == "values":
+            return list(self.cget("values"))
+        return self.cget(key)
+
+    def set(self, value):
+        super().set(value or self._placeholder)
+
+    def get(self):
+        value = super().get()
+        return "" if value == self._placeholder else value
+
+    def current(self, index=None):
+        values = list(self.cget("values"))
+        if index is None:
+            try:
+                return values.index(self.get())
+            except ValueError:
+                return -1
+        if 0 <= index < len(values):
+            self.set(values[index])
+
+
+class ModernButton(ctk.CTkButton):
+    """CTkButton adapter for the existing ttk style names."""
+
+    def __init__(self, master=None, **kwargs):
+        style = kwargs.pop("style", "Add.TButton")
+        palette = {
+            "Delete.TButton": ("#D96363", "#C44646"),
+            "Update.TButton": ("#175C8A", "#0B2F4A"),
+            "Add.TButton": ("#1F9C73", "#0F7A5A"),
+        }
+        fg_color, hover_color = palette.get(style, palette["Add.TButton"])
+        kwargs.setdefault("fg_color", fg_color)
+        kwargs.setdefault("hover_color", hover_color)
+        kwargs.setdefault("text_color", "#FFFFFF")
+        kwargs.setdefault("corner_radius", 10)
+        kwargs.setdefault("height", 38)
+        kwargs.setdefault("font", ("Segoe UI", 10, "bold"))
+        super().__init__(master, **kwargs)
+
+    config = ctk.CTkButton.configure
+
+
+# Existing business logic uses this name; the implementation is now CTk-native.
+ModernDropdown = ModernComboBox
+
+
 class AshscomGUI:
     STUDENT_PASSKEY = "ashscom2026"
     ACTION_PIN = "1835"
@@ -331,61 +445,75 @@ class AshscomGUI:
         self.root = root
         self.root.title("Ashscom Management System")
         self.root.geometry("1200x780")
-        self.root.configure(bg="#ADFFB1")
+        self.root.minsize(1180, 740)
+        self.root.configure(fg_color="#F3F9FC")
         self.setup_styles()
-        self.root.configure(bg="#F7FFF9")
+        self.root.configure(fg_color="#F3F9FC")
 
     def setup_styles(self):
         style = ttk.Style()
         style.theme_use("clam")
 
-        BG_COLOR = "#F4F6F9"
-        ADDU_BLUE = "#003366"
-        ADDU_GOLD = "#D4AF37"
-        ACTION_GREEN = "#198754"
+        BG_COLOR = "#eef4f8"
+        PANEL_BG = "#f7fbff"
+        CARD_BG = "#ffffff"
+        SHELL_BG = "#edf3f8"
+        ADDU_BLUE = "#0B2F4A"
+        ADDU_BLUE_DARK = "#072236"
+        ADDU_BLUE_LIGHT = "#1A5D8C"
+        ADDU_GOLD = "#EECC6C"
+        ACTION_GREEN = "#17B57D"
+        ACTION_GREEN_DARK = "#0E8F68"
+        SOFT_GREEN = "#EAFBF4"
+        SOFT_BLUE = "#EAF4FF"
+        NAVY = "#0D2E48"
+        NAVY_2 = "#123E64"
+        BLUE_ACCENT = "#1DA0D6"
+        BLUE_ACCENT_2 = "#0E71A7"
+        GREEN_ACCENT = "#18C998"
+        TEXT = "#1D2C3A"
+        MUTED = "#5F7A8B"
 
         style.configure("TFrame", background=BG_COLOR)
-        style.configure("TLabelframe", background=BG_COLOR, bordercolor=ADDU_BLUE)
-        style.configure("TLabel", background=BG_COLOR, font=("Segoe UI", 10))
+        style.configure("TLabelframe", background=BG_COLOR, bordercolor="#dfeaf2")
+        style.configure("TLabel", background=BG_COLOR, font=("Segoe UI", 10), foreground=TEXT)
 
         style.configure(
             "TLabelframe.Label",
             font=("Segoe UI", 11, "bold"),
-            foreground=ADDU_BLUE,
+            foreground="#1a2e3d",
             background=BG_COLOR,
         )
 
-        # Assign cards – must be defined early (used by both Add Student and Tasks tabs)
         style.configure(
             "Assign.TLabelframe",
-            background="#F7FFF9",
-            bordercolor="#003366",
+            background=PANEL_BG,
+            bordercolor="#0C3D63",
             relief="flat",
             borderwidth=1,
         )
         style.configure(
             "Assign.TLabelframe.Label",
             font=("Segoe UI", 11, "bold"),
-            foreground="#003366",
-            background="#F7FFF9",
+            foreground="#0C3D63",
+            background=PANEL_BG,
         )
-        # Sub-notebook pills (Tasks / Assignments switch)
+
         style.configure("Modern.Sub.TNotebook", background=BG_COLOR, borderwidth=0)
         style.configure(
             "Modern.Sub.TNotebook.Tab",
             font=("Segoe UI", 9, "bold"),
-            padding=[14, 6],
-            background="#EAFBEC",
+            padding=[18, 8],
+            background="#EAF5EF",
             foreground="#0A2340",
         )
         style.map(
             "Modern.Sub.TNotebook.Tab",
-            background=[("selected", "#198754")],
+            background=[("selected", ACTION_GREEN)],
             foreground=[("selected", "white")],
         )
 
-        # Entry Fields - Blue resting, Green focus
-        style.configure("TEntry", padding=6, relief="flat", bordercolor="#B0C4DE")
+        style.configure("TEntry", padding=8, relief="flat", bordercolor="#D7E4EE")
         style.map(
             "TEntry",
             bordercolor=[("focus", ACTION_GREEN)],
@@ -393,59 +521,65 @@ class AshscomGUI:
             darkcolor=[("focus", ACTION_GREEN)],
         )
 
-        # Action Buttons
         style.configure(
             "Add.TButton",
             font=("Segoe UI", 10, "bold"),
-            padding=8,
+            padding=10,
             background=ACTION_GREEN,
             foreground="white",
+            borderwidth=0,
+            relief="flat",
         )
-        style.map("Add.TButton", background=[("active", "#157347")])
+        style.map(
+            "Add.TButton",
+            background=[("active", ACTION_GREEN_DARK)],
+            foreground=[("active", "white")],
+        )
 
         style.configure(
             "Update.TButton",
             font=("Segoe UI", 10, "bold"),
-            padding=8,
-            background="#157347",
+            padding=9,
+            background="#177A5A",
             foreground="#FFFFFF",
+            borderwidth=0,
         )
         style.map(
             "Update.TButton",
-            background=[("active", "#157347"), ("disabled", "#7ED985")],
+            background=[("active", ACTION_GREEN_DARK), ("disabled", "#A8DCC7")],
             foreground=[("disabled", "#FFFFFF")],
         )
         style.configure(
             "Delete.TButton",
             font=("Segoe UI", 10, "bold"),
-            padding=8,
-            background="#D9534F",
+            padding=9,
+            background="#D75D5D",
             foreground="white",
+            borderwidth=0,
         )
         style.map(
             "Delete.TButton",
-            background=[("active", "#C9302C"), ("disabled", "#F2A6A6")],
+            background=[("active", "#C44646"), ("disabled", "#F3B8B8")],
             foreground=[("disabled", "#F4F6F9")],
         )
 
-        # Treeview
         style.configure(
             "Treeview",
             font=("Segoe UI", 10),
             rowheight=32,
-            background="white",
-            fieldbackground="white",
-            foreground="#1A1A1A",
+            background="#ffffff",
+            fieldbackground="#ffffff",
+            foreground="#1D2C3A",
         )
         style.map(
             "Treeview",
-            background=[("selected", "#E8F5E9")],  # Light green selection
-            foreground=[("selected", ACTION_GREEN)],
+            background=[("selected", "#DDF5EA")],
+            foreground=[("selected", "#0D684A")],
         )
         style.configure(
             "Treeview.Heading",
             font=("Segoe UI", 10, "bold"),
-            background=ADDU_BLUE,
+            background="#0A3B5B",
             foreground="white",
         )
         style.map("Treeview.Heading", background=[("active", "#00205B")])
@@ -454,13 +588,13 @@ class AshscomGUI:
         self.root.option_add("*Entry.selectBackground", "#D4FFD9")
         self.root.option_add("*Entry.selectForeground", "#004202")
 
-        header_canvas = tk.Canvas(self.root, height=100, highlightthickness=0)
+        header_canvas = tk.Canvas(self.root, height=118, highlightthickness=0, bg="#0b2f4a")
         header_canvas.pack(fill="x")
 
-        logo1_img = Image.open("ateneo1.png").resize((65, 65))
+        logo1_img = Image.open("ateneo1.png").resize((62, 62))
         self.logo1 = ImageTk.PhotoImage(logo1_img)
 
-        logo2_img = Image.open("ashscom.png").resize((90, 90))
+        logo2_img = Image.open("ashscom.png").resize((80, 80))
         self.logo2 = ImageTk.PhotoImage(logo2_img)
 
         # Modernized scrollbars
@@ -493,55 +627,54 @@ class AshscomGUI:
         )
 
         def redraw_header(event):
-            width = event.width
-            height = 100
-            header_canvas.delete("all")  # clear everything and redraw fresh
+            width = max(1, event.width)
+            height = 118
+            header_canvas.delete("all")
 
-            # Gradient
-            r1, g1, b1 = self.root.winfo_rgb("#00153B")
-            r2, g2, b2 = self.root.winfo_rgb("#003366")
+            def mix(c1, c2, ratio):
+                r1, g1, b1 = self.root.winfo_rgb(c1)
+                r2, g2, b2 = self.root.winfo_rgb(c2)
+                r = int(r1/256 + (r2/256 - r1/256) * ratio)
+                g = int(g1/256 + (g2/256 - g1/256) * ratio)
+                b = int(b1/256 + (b2/256 - b1/256) * ratio)
+                return f"#{r:02x}{g:02x}{b:02x}"
 
             for i in range(height):
-                nr = int(r1 + (r2 - r1) * i / height) >> 8
-                ng = int(g1 + (g2 - g1) * i / height) >> 8
-                nb = int(b1 + (b2 - b1) * i / height) >> 8
-                color = f"#{nr:02x}{ng:02x}{nb:02x}"
-                header_canvas.create_line(0, i, width, i, fill=color)
+                ratio = i / max(1, height - 1)
+                color = mix("#031a3d", "#15b18a", ratio)
+                header_canvas.create_line(0, i, width, i, fill=color, width=1)
 
-            # Logos
-            header_canvas.create_image(35, 50, image=self.logo1, anchor="w")
-            header_canvas.create_image(115, 50, image=self.logo2, anchor="w")
+            header_canvas.create_image(30, 58, image=self.logo1, anchor="w")
+            header_canvas.create_image(105, 58, image=self.logo2, anchor="w")
 
-            # Text - right-aligned using the CURRENT width, every time
-            right_x = width - 15
             header_canvas.create_text(
-                right_x,
-                28,
+                width - 18,
+                32,
                 text="Ateneo De Davao University Senior High School",
                 font=("Segoe UI", 12, "bold"),
-                fill="#F4F6F9",
+                fill="#eef8ff",
                 anchor="e",
             )
             header_canvas.create_text(
-                right_x,
-                48,
+                width - 18,
+                55,
                 text="Commission on Elections",
                 font=("Segoe UI", 12, "bold"),
-                fill="#F4F6F9",
+                fill="#eef8ff",
                 anchor="e",
             )
             header_canvas.create_text(
-                right_x,
-                75,
+                width - 18,
+                88,
                 text="ASHSCOM MANAGEMENT SYSTEM",
-                font=("Segoe UI", 23, "bold"),
-                fill="#D4AF37",
+                font=("Segoe UI", 25, "bold"),
+                fill="#f2d67a",
                 anchor="e",
             )
 
         header_canvas.bind("<Configure>", redraw_header)
 
-        divider = tk.Frame(self.root, bg="#198754", height=3)
+        divider = tk.Frame(self.root, bg="#1bc48d", height=4)
         divider.pack(fill="x")
 
         # Create a connection to the database
@@ -551,15 +684,31 @@ class AshscomGUI:
             self.root.destroy()
             return
 
-        # --- Sidebar + Content layout (replaces Notebook tabs) ---
-        body_frame = ttk.Frame(self.root)
+        body_frame = ctk.CTkFrame(self.root, fg_color="#F3F9FC", corner_radius=0)
         body_frame.pack(expand=True, fill="both")
 
-        sidebar = tk.Frame(body_frame, bg="#00205B", width=230)
+        sidebar = ctk.CTkFrame(body_frame, fg_color="#072236", width=238, corner_radius=0)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
-        content_frame = ttk.Frame(body_frame)
+        sidebar_top = ctk.CTkFrame(sidebar, fg_color="transparent", corner_radius=0)
+        sidebar_top.pack(fill="x")
+        ctk.CTkLabel(
+            sidebar_top,
+            text="ASHSCOM",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 22, "bold"),
+            anchor="w",
+        ).pack(fill="x", padx=22, pady=(28, 2))
+        ctk.CTkLabel(
+            sidebar_top,
+            text="Management System",
+            text_color="#9FC4D6",
+            font=("Segoe UI", 10),
+            anchor="w",
+        ).pack(fill="x", padx=22, pady=(0, 28))
+
+        content_frame = ctk.CTkFrame(body_frame, fg_color="#F3F9FC", corner_radius=0)
         content_frame.pack(side="right", expand=True, fill="both")
 
         content_frame.grid_rowconfigure(0, weight=1)
@@ -574,50 +723,48 @@ class AshscomGUI:
             self.pages[name].tkraise()
             self.nav_buttons_active = name
             for key, b in self.nav_buttons.items():
-                b.config(bg="#00205B", fg="white")
-                self.nav_accents[key].config(bg="#00205B")
-            self.nav_buttons[name].config(bg="#003366", fg="#28A745")
-            self.nav_accents[name].config(bg="#28A745")
+                b.configure(fg_color="#072236", text_color="#EAF6FF")
+                self.nav_accents[key].configure(fg_color="#072236")
+            self.nav_buttons[name].configure(fg_color="#175C8A", text_color="#FFFFFF")
+            self.nav_accents[name].configure(fg_color="#1F9C73")
 
         nav_buttons = [
-            ("👥  Students", "students"),
-            ("➕  Add Student/Tasks", "add_student"),
-            ("📋  Tasks/Assignments", "task/assignment"),
+            ("Students", "students"),
+            ("Add Student / Tasks", "add_student"),
+            ("Tasks & Assignments", "task/assignment"),
         ]
         for label, key in nav_buttons:
-            row = tk.Frame(sidebar, bg="#00205B")
-            row.pack(fill="x", pady=(4, 0))
+            row = ctk.CTkFrame(sidebar, fg_color="transparent", corner_radius=0)
+            row.pack(fill="x")
 
-            accent = tk.Frame(row, bg="#00205B", width=5)
-            accent.pack(side="left", fill="y")
+            accent = ctk.CTkFrame(row, fg_color="#072236", width=5, height=44, corner_radius=3)
+            accent.pack(side="left", fill="y", padx=(14, 9), pady=5)
             self.nav_accents[key] = accent
 
-            btn = tk.Button(
+            btn = ctk.CTkButton(
                 row,
                 text=label,
-                font=("Segoe UI", 11, "bold"),
-                bg="#00205B",
-                fg="white",
-                activebackground="#003366",
-                activeforeground="#28A745",
-                bd=0,
-                relief="flat",
+                font=("Segoe UI", 10, "bold"),
+                fg_color="#072236",
+                hover_color="#175C8A",
+                text_color="#EAF6FF",
+                corner_radius=10,
                 anchor="w",
-                padx=18,
-                pady=16,
+                height=44,
                 cursor="hand2",
+                width=170,
                 command=lambda k=key: show_page(k),
             )
-            btn.pack(side="left", fill="x", expand=True)
+            btn.pack(side="left", fill="x", expand=True, padx=(0, 14), pady=5)
             self.nav_buttons[key] = btn
 
             def on_enter(e, k=key):
                 if self.nav_buttons_active != k:
-                    self.nav_buttons[k].config(bg="#003366")
+                    self.nav_buttons[k].configure(fg_color="#123E64")
 
             def on_leave(e, k=key):
                 if self.nav_buttons_active != k:
-                    self.nav_buttons[k].config(bg="#00205B")
+                    self.nav_buttons[k].configure(fg_color="#072236")
 
             btn.bind("<Enter>", on_enter)
             btn.bind("<Leave>", on_leave)
@@ -874,7 +1021,7 @@ class AshscomGUI:
             pass
 
     def create_students_tab(self, parent):
-        settings_frame = ttk.Frame(parent)
+        settings_frame = ctk.CTkFrame(parent, fg_color="#F3F9FC", corner_radius=0)
         settings_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["students"] = settings_frame
 
@@ -901,7 +1048,7 @@ class AshscomGUI:
         ttk.Label(form_frame, text="Student Name:").grid(
             row=0, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
-        self.edit_name_entry = ttk.Entry(form_frame, width=FIELD_WIDTH)
+        self.edit_name_entry = ctk.CTkEntry(form_frame, width=220, height=38, corner_radius=10, border_color="#B8CBD8")
         self.edit_name_entry.grid(row=0, column=1, padx=10, pady=ROW_PADY, sticky="ew")
 
         ttk.Label(form_frame, text="Grade Level:").grid(
@@ -939,7 +1086,7 @@ class AshscomGUI:
         )
         email_row = ttk.Frame(form_frame)
         email_row.grid(row=3, column=1, padx=10, pady=ROW_PADY, sticky="ew")
-        self.edit_email_entry = ttk.Entry(email_row, width=FIELD_WIDTH - 12)
+        self.edit_email_entry = ctk.CTkEntry(email_row, width=150, height=38, corner_radius=10, border_color="#B8CBD8")
         self.edit_email_entry.pack(side="left")
         ttk.Label(email_row, text="@addu.edu.ph").pack(side="left")
 
@@ -981,7 +1128,7 @@ class AshscomGUI:
         )
         self.edit_role_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
 
-        self.update_btn = ttk.Button(
+        self.update_btn = ModernButton(
             form_frame,
             text="🔼 Update Selected",
             style="Update.TButton",
@@ -992,7 +1139,7 @@ class AshscomGUI:
             row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
         )
 
-        self.delete_btn = ttk.Button(
+        self.delete_btn = ModernButton(
             form_frame,
             text="🗑 Delete Selected",
             style="Delete.TButton",
@@ -1021,7 +1168,7 @@ class AshscomGUI:
             text="Student records are protected.",
             font=("Segoe UI", 11, "bold"),
         ).pack(pady=(0, 15))
-        ttk.Button(
+        ModernButton(
             lock_inner,
             text="🔍 View Students",
             style="Add.TButton",
@@ -1087,7 +1234,7 @@ class AshscomGUI:
         self.lock_frame.tkraise()
 
     def create_tasks_assignments_tab(self, parent):
-        settings_frame = ttk.Frame(parent)
+        settings_frame = ctk.CTkFrame(parent, fg_color="#F3F9FC", corner_radius=0)
         settings_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["tasks/assignments"] = settings_frame
 
@@ -1194,7 +1341,7 @@ class AshscomGUI:
         return tree
 
     def create_add_student_tab(self, parent):
-        students_frame = ttk.Frame(parent)
+        students_frame = ctk.CTkFrame(parent, fg_color="#F3F9FC", corner_radius=0)
         students_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["add_student"] = students_frame
 
@@ -1220,7 +1367,7 @@ class AshscomGUI:
         ttk.Label(entry_frame, text="Student Name:").grid(
             row=0, column=0, padx=10, pady=_PY, sticky="w"
         )
-        self.name_entry = ttk.Entry(entry_frame, width=_FW)
+        self.name_entry = ctk.CTkEntry(entry_frame, width=220, height=38, corner_radius=10, border_color="#B8CBD8")
         self.name_entry.grid(row=0, column=1, padx=10, pady=_PY, sticky="ew")
 
         ttk.Label(entry_frame, text="Grade Level:").grid(
@@ -1250,7 +1397,7 @@ class AshscomGUI:
         )
         email_row = ttk.Frame(entry_frame)
         email_row.grid(row=3, column=1, padx=10, pady=_PY, sticky="ew")
-        self.email_entry = ttk.Entry(email_row, width=_FW - 12)
+        self.email_entry = ctk.CTkEntry(email_row, width=150, height=38, corner_radius=10, border_color="#B8CBD8")
         self.email_entry.pack(side="left")
         ttk.Label(email_row, text="@addu.edu.ph").pack(side="left")
 
@@ -1289,7 +1436,7 @@ class AshscomGUI:
         self.committee_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
         self.role_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
 
-        ttk.Button(
+        ModernButton(
             button_frame,
             text="+ Add Student",
             style="Add.TButton",
@@ -1320,7 +1467,7 @@ class AshscomGUI:
         ttk.Label(assign_tasks_frame, text="Task Name:").grid(
             row=0, column=0, padx=10, pady=6, sticky="w"
         )
-        self.task_name_entry = ttk.Entry(assign_tasks_frame, width=_AFW)
+        self.task_name_entry = ctk.CTkEntry(assign_tasks_frame, width=220, height=38, corner_radius=10, border_color="#B8CBD8")
         self.task_name_entry.grid(row=0, column=1, padx=10, pady=6, sticky="ew")
 
         ttk.Label(assign_tasks_frame, text="Committee:").grid(
@@ -1336,13 +1483,13 @@ class AshscomGUI:
         )
         date_row = ttk.Frame(assign_tasks_frame)
         date_row.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
-        self.task_due_date_entry = ttk.Entry(date_row, width=14)
+        self.task_due_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
         self.task_due_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.task_due_date_entry).pack(
             side="left", padx=(4, 0)
         )
 
-        add_task_button = ttk.Button(
+        add_task_button = ModernButton(
             assign_tasks_frame,
             text="＋ Add Task",
             style="Add.TButton",
@@ -1387,7 +1534,7 @@ class AshscomGUI:
         )
         date_row = ttk.Frame(assign_tasks_frame)
         date_row.grid(row=8, column=1, padx=10, pady=6, sticky="ew")
-        self.assign_date_entry = ttk.Entry(date_row, width=14)
+        self.assign_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
         self.assign_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.assign_date_entry).pack(
             side="left", padx=(4, 0)
@@ -1409,7 +1556,7 @@ class AshscomGUI:
         if self.assign_status_combo["values"]:
             self.assign_status_combo.current(0)
 
-        assign_task_button = ttk.Button(
+        assign_task_button = ModernButton(
             assign_tasks_frame,
             text="✓ Assign Task",
             style="Add.TButton",
@@ -1430,7 +1577,7 @@ class AshscomGUI:
         self._load_members_for_assignment()
 
     def create_tasks_assignments_tab(self, parent):
-        settings_frame = ttk.Frame(parent)
+        settings_frame = ctk.CTkFrame(parent, fg_color="#F3F9FC", corner_radius=0)
         settings_frame.grid(row=0, column=0, sticky="nsew")
         # let lock/data layers fill settings_frame
         settings_frame.rowconfigure(0, weight=1)
@@ -1449,7 +1596,7 @@ class AshscomGUI:
             text="Task records are protected.",
             font=("Segoe UI", 11, "bold"),
         ).pack(pady=(0, 15))
-        ttk.Button(
+        ModernButton(
             lock_inner,
             text="🔍 View Tasks",
             style="Add.TButton",
@@ -1606,7 +1753,7 @@ class AshscomGUI:
         ttk.Label(parent, text="Task Name:").grid(
             row=0, column=0, padx=10, pady=row_pady, sticky="w"
         )
-        self.update_task_name_entry = ttk.Entry(parent, width=field_width)
+        self.update_task_name_entry = ctk.CTkEntry(parent, width=200, height=38, corner_radius=10, border_color="#B8CBD8")
         self.update_task_name_entry.grid(
             row=0, column=1, padx=10, pady=row_pady, sticky="ew"
         )
@@ -1629,7 +1776,7 @@ class AshscomGUI:
         )
         date_row = ttk.Frame(parent)
         date_row.grid(row=2, column=1, padx=10, pady=row_pady, sticky="ew")
-        self.update_task_due_date_entry = ttk.Entry(date_row, width=field_width - 3)
+        self.update_task_due_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
         self.update_task_due_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.update_task_due_date_entry).pack(
             side="left", padx=(4, 0)
@@ -1642,7 +1789,7 @@ class AshscomGUI:
         task_button_row.columnconfigure(0, weight=1)
         task_button_row.columnconfigure(1, weight=1)
 
-        self.task_update_btn = ttk.Button(
+        self.task_update_btn = ModernButton(
             task_button_row,
             text="🔼 Update Task",
             style="Update.TButton",
@@ -1651,7 +1798,7 @@ class AshscomGUI:
         )
         self.task_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
 
-        self.task_delete_btn = ttk.Button(
+        self.task_delete_btn = ModernButton(
             task_button_row,
             text="🗑 Delete Task",
             style="Delete.TButton",
@@ -1697,7 +1844,7 @@ class AshscomGUI:
         )
         date_row = ttk.Frame(parent)
         date_row.grid(row=2, column=1, padx=10, pady=row_pady, sticky="ew")
-        self.update_assignment_date_entry = ttk.Entry(date_row, width=field_width - 3)
+        self.update_assignment_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
         self.update_assignment_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.update_assignment_date_entry).pack(
             side="left", padx=(4, 0)
@@ -1723,7 +1870,7 @@ class AshscomGUI:
         assignment_button_row.columnconfigure(0, weight=1)
         assignment_button_row.columnconfigure(1, weight=1)
 
-        self.assignment_update_btn = ttk.Button(
+        self.assignment_update_btn = ModernButton(
             assignment_button_row,
             text="🔼 Update Assignment",
             style="Update.TButton",
@@ -1732,7 +1879,7 @@ class AshscomGUI:
         )
         self.assignment_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
 
-        self.assignment_delete_btn = ttk.Button(
+        self.assignment_delete_btn = ModernButton(
             assignment_button_row,
             text="🗑 Delete Assignment",
             style="Delete.TButton",
@@ -1786,7 +1933,7 @@ class AshscomGUI:
         ttk.Label(form_frame, text="Task Name:").grid(
             row=0, column=0, padx=(0, 5), pady=3, sticky="w"
         )
-        self.task_update_name_entry = ttk.Entry(form_frame, width=22)
+        self.task_update_name_entry = ctk.CTkEntry(form_frame, width=200, height=38, corner_radius=10, border_color="#B8CBD8")
         self.task_update_name_entry.grid(
             row=0, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
@@ -1807,7 +1954,7 @@ class AshscomGUI:
         ttk.Label(form_frame, text="Due Date:").grid(
             row=2, column=0, padx=(0, 5), pady=3, sticky="w"
         )
-        self.task_update_due_date_entry = ttk.Entry(form_frame, width=14)
+        self.task_update_due_date_entry = ctk.CTkEntry(form_frame, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
         self.task_update_due_date_entry.grid(
             row=2, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
@@ -1869,7 +2016,7 @@ class AshscomGUI:
         ttk.Label(form_frame, text="Date:").grid(
             row=2, column=0, padx=(0, 5), pady=3, sticky="w"
         )
-        self.assignment_update_date_entry = ttk.Entry(form_frame, width=14)
+        self.assignment_update_date_entry = ctk.CTkEntry(form_frame, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
         self.assignment_update_date_entry.grid(
             row=2, column=1, padx=(0, 10), pady=3, sticky="ew"
         )
@@ -2450,10 +2597,10 @@ class AshscomGUI:
 
         btn_row = tk.Frame(content, bg="#F7FFF9")
         btn_row.pack(anchor="w")
-        ttk.Button(
+        ModernButton(
             btn_row, text="Confirm", style="Add.TButton", command=confirm, width=10
         ).pack(side="left", padx=(0, 8))
-        ttk.Button(
+        ModernButton(
             btn_row, text="Cancel", style="Update.TButton", command=cancel, width=10
         ).pack(side="left")
 
@@ -2517,10 +2664,10 @@ class AshscomGUI:
 
         btn_row = tk.Frame(content, bg="#F7FFF9")
         btn_row.pack(anchor="w")
-        ttk.Button(
+        ModernButton(
             btn_row, text="Confirm", style="Add.TButton", command=confirm, width=10
         ).pack(side="left", padx=(0, 8))
-        ttk.Button(
+        ModernButton(
             btn_row, text="Cancel", style="Update.TButton", command=cancel, width=10
         ).pack(side="left")
         entry.bind("<Return>", lambda e: confirm())
@@ -2586,10 +2733,10 @@ class AshscomGUI:
 
         btn_row = tk.Frame(content, bg="#F7FFF9")
         btn_row.pack()
-        ttk.Button(
+        ModernButton(
             btn_row, text="Confirm", style="Add.TButton", command=confirm, width=10
         ).pack(side="left", padx=(0, 8))
-        ttk.Button(
+        ModernButton(
             btn_row, text="Cancel", style="Update.TButton", command=cancel, width=10
         ).pack(side="left")
 
@@ -2939,6 +3086,8 @@ class AshscomGUI:
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    ctk.set_appearance_mode("light")
+    ctk.set_default_color_theme("blue")
+    root = ctk.CTk()
     app = AshscomGUI(root)
     root.mainloop()

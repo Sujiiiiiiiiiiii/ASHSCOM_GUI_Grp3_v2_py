@@ -330,7 +330,7 @@ class AshscomGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Ashscom Management System")
-        self.root.geometry("1200x700")
+        self.root.geometry("1200x780")
         self.root.configure(bg="#ADFFB1")
         self.setup_styles()
         self.root.configure(bg="#F7FFF9")
@@ -353,6 +353,35 @@ class AshscomGUI:
             font=("Segoe UI", 11, "bold"),
             foreground=ADDU_BLUE,
             background=BG_COLOR,
+        )
+
+        # Assign cards – must be defined early (used by both Add Student and Tasks tabs)
+        style.configure(
+            "Assign.TLabelframe",
+            background="#F7FFF9",
+            bordercolor="#003366",
+            relief="flat",
+            borderwidth=1,
+        )
+        style.configure(
+            "Assign.TLabelframe.Label",
+            font=("Segoe UI", 11, "bold"),
+            foreground="#003366",
+            background="#F7FFF9",
+        )
+        # Sub-notebook pills (Tasks / Assignments switch)
+        style.configure("Modern.Sub.TNotebook", background=BG_COLOR, borderwidth=0)
+        style.configure(
+            "Modern.Sub.TNotebook.Tab",
+            font=("Segoe UI", 9, "bold"),
+            padding=[14, 6],
+            background="#EAFBEC",
+            foreground="#0A2340",
+        )
+        style.map(
+            "Modern.Sub.TNotebook.Tab",
+            background=[("selected", "#198754")],
+            foreground=[("selected", "white")],
         )
 
         # Entry Fields - Blue resting, Green focus
@@ -1091,6 +1120,7 @@ class AshscomGUI:
             yscrollcommand=tree_scroll_y.set,
             xscrollcommand=tree_scroll_x.set,
             selectmode="browse",
+            height=18,
         )
         tree.pack(fill="both", expand=True)
         tree_scroll_y.config(command=tree.yview)
@@ -1141,6 +1171,7 @@ class AshscomGUI:
             yscrollcommand=tree_scroll_y.set,
             xscrollcommand=tree_scroll_x.set,
             selectmode="browse",
+            height=18,
         )
         tree.pack(fill="both", expand=True)
         tree_scroll_y.config(command=tree.yview)
@@ -1265,7 +1296,7 @@ class AshscomGUI:
             command=self.add_student,
         ).pack(side="left", padx=8, ipadx=0)
 
-        # --- Assign Tasks section (right) - Add Task Functionality ---
+        # --- Assign Tasks section (right) - Modern card ---
         assign_tasks_frame = ttk.LabelFrame(container, text="Assign Tasks")
         assign_tasks_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=5)
 
@@ -1273,6 +1304,18 @@ class AshscomGUI:
         assign_tasks_frame.columnconfigure(0, weight=0, minsize=110)
         assign_tasks_frame.columnconfigure(1, weight=1)
         _AFW = 22  # same field width as left form for visual alignment
+        # modern header tint to match Students
+        try:
+            style.configure("Assign.TLabelframe", background="#F7FFF9")
+            style.configure(
+                "Assign.TLabelframe.Label",
+                background="#F7FFF9",
+                foreground="#0A2340",
+                font=("Segoe UI", 10, "bold"),
+            )
+            assign_tasks_frame.configure(style="Assign.TLabelframe")
+        except Exception:
+            pass
 
         ttk.Label(assign_tasks_frame, text="Task Name:").grid(
             row=0, column=0, padx=10, pady=6, sticky="w"
@@ -1301,44 +1344,49 @@ class AshscomGUI:
 
         add_task_button = ttk.Button(
             assign_tasks_frame,
-            text="Add Task",
+            text="＋ Add Task",
             style="Add.TButton",
             command=self.add_task,
         )
-        add_task_button.grid(row=3, column=0, columnspan=2, pady=15)
+        add_task_button.grid(
+            row=3, column=0, columnspan=2, pady=(12, 8), ipadx=8, ipady=2
+        )
 
         self.task_committee_combo.bind(
             "<<ComboboxSelected>>", self._clear_combo_highlight
         )
         self._load_committees_for_task()
 
+        sep = ttk.Separator(assign_tasks_frame, orient="horizontal")
+        sep.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 4))
         ttk.Label(
             assign_tasks_frame,
-            text="--- Assign Task to Member ---",
-            font=("Segoe UI", 9, "italic"),
-        ).grid(row=4, column=0, columnspan=2, pady=(10, 5))
+            text="Assign Task to Member",
+            font=("Segoe UI", 9, "bold"),
+            foreground="#0A2340",
+        ).grid(row=5, column=0, columnspan=2, pady=(0, 6))
 
         ttk.Label(assign_tasks_frame, text="Task:").grid(
-            row=5, column=0, padx=10, pady=6, sticky="w"
+            row=6, column=0, padx=10, pady=6, sticky="w"
         )
         self.assign_task_combo = ModernDropdown(
             assign_tasks_frame, width=_AFW, state="readonly"
         )
-        self.assign_task_combo.grid(row=5, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_task_combo.grid(row=6, column=1, padx=10, pady=6, sticky="ew")
 
         ttk.Label(assign_tasks_frame, text="Member:").grid(
-            row=6, column=0, padx=10, pady=6, sticky="w"
+            row=7, column=0, padx=10, pady=6, sticky="w"
         )
         self.assign_member_combo = ModernDropdown(
             assign_tasks_frame, width=_AFW, state="readonly"
         )
-        self.assign_member_combo.grid(row=6, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_member_combo.grid(row=7, column=1, padx=10, pady=6, sticky="ew")
 
         ttk.Label(assign_tasks_frame, text="Date Assigned (YYYY-MM-DD):").grid(
-            row=7, column=0, padx=10, pady=6, sticky="w"
+            row=8, column=0, padx=10, pady=6, sticky="w"
         )
         date_row = ttk.Frame(assign_tasks_frame)
-        date_row.grid(row=7, column=1, padx=10, pady=6, sticky="ew")
+        date_row.grid(row=8, column=1, padx=10, pady=6, sticky="ew")
         self.assign_date_entry = ttk.Entry(date_row, width=14)
         self.assign_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.assign_date_entry).pack(
@@ -1346,12 +1394,12 @@ class AshscomGUI:
         )
 
         ttk.Label(assign_tasks_frame, text="Status:").grid(
-            row=8, column=0, padx=10, pady=6, sticky="w"
+            row=9, column=0, padx=10, pady=6, sticky="w"
         )
         self.assign_status_combo = ModernDropdown(
             assign_tasks_frame, width=_AFW, state="readonly"
         )
-        self.assign_status_combo.grid(row=8, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_status_combo.grid(row=9, column=1, padx=10, pady=6, sticky="ew")
         self.assign_status_combo["values"] = [
             "Pending",
             "In Progress",
@@ -1363,11 +1411,13 @@ class AshscomGUI:
 
         assign_task_button = ttk.Button(
             assign_tasks_frame,
-            text="Assign Task",
+            text="✓ Assign Task",
             style="Add.TButton",
             command=self.assign_task,
         )
-        assign_task_button.grid(row=9, column=0, columnspan=2, pady=15)
+        assign_task_button.grid(
+            row=10, column=0, columnspan=2, pady=(12, 10), ipadx=8, ipady=2
+        )
 
         self.assign_task_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
         self.assign_member_combo.bind(
@@ -1382,9 +1432,51 @@ class AshscomGUI:
     def create_tasks_assignments_tab(self, parent):
         settings_frame = ttk.Frame(parent)
         settings_frame.grid(row=0, column=0, sticky="nsew")
+        # let lock/data layers fill settings_frame
+        settings_frame.rowconfigure(0, weight=1)
+        settings_frame.columnconfigure(0, weight=1)
         self.pages["task/assignment"] = settings_frame
 
-        sub_notebook = ttk.Notebook(settings_frame)
+        # --- lock cover (same passkey as students) ---
+        self.task_lock_frame = ttk.Frame(settings_frame)
+        self.task_lock_frame.grid(row=0, column=0, sticky="nsew")
+
+        lock_inner = ttk.Frame(self.task_lock_frame)
+        lock_inner.place(relx=0.5, rely=0.4, anchor="center")
+        ttk.Label(lock_inner, text="🔒", font=("Segoe UI", 40)).pack(pady=(0, 10))
+        ttk.Label(
+            lock_inner,
+            text="Task records are protected.",
+            font=("Segoe UI", 11, "bold"),
+        ).pack(pady=(0, 15))
+        ttk.Button(
+            lock_inner,
+            text="🔍 View Tasks",
+            style="Add.TButton",
+            command=self._prompt_unlock_tasks,
+        ).pack()
+
+        self.task_data_frame = ttk.Frame(settings_frame)
+        self.task_data_frame.grid(row=0, column=0, sticky="nsew")
+
+        # modern pill sub-tabs — Tasks / Assignments
+        try:
+            style.configure("Modern.Sub.TNotebook", background="#F7FFF9", borderwidth=0)
+            style.configure(
+                "Modern.Sub.TNotebook.Tab",
+                padding=(18, 8),
+                font=("Segoe UI", 10, "bold"),
+                background="#EAFBEC",
+                foreground="#0A2340",
+            )
+            style.map(
+                "Modern.Sub.TNotebook.Tab",
+                background=[("selected", "#198754")],
+                foreground=[("selected", "white")],
+            )
+        except Exception:
+            pass
+        sub_notebook = ttk.Notebook(self.task_data_frame, style="Modern.Sub.TNotebook")
         sub_notebook.pack(fill="both", expand=True, padx=15, pady=15)
 
         tasks_page = ttk.Frame(sub_notebook)
@@ -1435,16 +1527,21 @@ class AshscomGUI:
         task_body = ttk.Frame(tasks_page)
         task_body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
         task_body.columnconfigure(0, weight=1)
+        task_body.rowconfigure(0, weight=1)
 
-        task_tree_frame = ttk.LabelFrame(task_body, text="Task List")
+        task_tree_frame = ttk.LabelFrame(
+            task_body, text="Task List", style="Assign.TLabelframe"
+        )
         task_tree_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.tasks_tree = self._build_task_tree(task_tree_frame)
         self.tasks_tree.bind(
             "<<TreeviewSelect>>", lambda e: self._on_update_task_selected()
         )
 
-        task_form_frame = ttk.LabelFrame(task_body, text="Update Task")
-        task_form_frame.grid(row=0, column=1, sticky="ns", padx=(5, 0))
+        task_form_frame = ttk.LabelFrame(
+            task_body, text="Update Task", style="Assign.TLabelframe"
+        )
+        task_form_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         self._build_update_tasks(task_form_frame)
 
         # --- ASSIGNMENTS SUBTAB ---
@@ -1478,17 +1575,24 @@ class AshscomGUI:
         assign_body = ttk.Frame(assignments_page)
         assign_body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
         assign_body.columnconfigure(0, weight=1)
+        assign_body.rowconfigure(0, weight=1)
 
-        assign_tree_frame = ttk.LabelFrame(assign_body, text="Assignment List")
+        assign_tree_frame = ttk.LabelFrame(
+            assign_body, text="Assignment List", style="Assign.TLabelframe"
+        )
         assign_tree_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.assignments_tree = self._build_assignment_tree(assign_tree_frame)
         self.assignments_tree.bind(
             "<<TreeviewSelect>>", lambda e: self._on_update_assignment_selected()
         )
 
-        assign_form_frame = ttk.LabelFrame(assign_body, text="Update Assignment")
-        assign_form_frame.grid(row=0, column=1, sticky="ns", padx=(5, 0))
+        assign_form_frame = ttk.LabelFrame(
+            assign_body, text="Update Assignment", style="Assign.TLabelframe"
+        )
+        assign_form_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         self._build_update_assignments(assign_form_frame)
+
+        self.task_lock_frame.tkraise()
 
         self.load_tasks()
         self.load_assignments()
@@ -1850,6 +1954,7 @@ class AshscomGUI:
             yscrollcommand=tree_scroll_y.set,
             xscrollcommand=tree_scroll_x.set,
             selectmode="browse",
+            height=18,
         )
         tree.pack(fill="both", expand=True)
         tree_scroll_y.config(command=tree.yview)
@@ -2361,6 +2466,72 @@ class AshscomGUI:
         if entered == self.STUDENT_PASSKEY:
             self.data_frame.tkraise()
             self.load_students()
+        else:
+            messagebox.showerror("Access Denied", "Incorrect passkey.")
+
+    def _prompt_unlock_tasks(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Enter Passkey")
+        dialog.configure(bg="#F7FFF9")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.update_idletasks()
+        w, h = 320, 180
+        x = (dialog.winfo_screenwidth() // 2) - (w // 2)
+        y = (dialog.winfo_screenheight() // 2) - (h // 2)
+        dialog.geometry(f"{w}x{h}+{x}+{y}")
+        content = tk.Frame(dialog, bg="#F7FFF9")
+        content.pack(fill="both", expand=True, padx=20, pady=15)
+        ttk.Label(
+            content, text="Enter passkey to view tasks:", font=("Segoe UI", 10)
+        ).pack(anchor="w", pady=(0, 8))
+        entry_var = tk.StringVar()
+        entry = ttk.Entry(content, textvariable=entry_var, width=30, show="*")
+        entry.pack(fill="x", pady=(0, 8))
+        entry.focus_set()
+        show_var = tk.BooleanVar(value=False)
+
+        def toggle_show():
+            entry.config(show="" if show_var.get() else "*")
+
+        tk.Checkbutton(
+            content,
+            text="Show passkey",
+            variable=show_var,
+            command=toggle_show,
+            bg="#F7FFF9",
+            fg="#0F1A0F",
+            activebackground="#F7FFF9",
+            font=("Segoe UI", 9),
+            selectcolor="white",
+        ).pack(anchor="w", pady=(0, 15))
+        result = {"value": None}
+
+        def confirm():
+            result["value"] = entry_var.get()
+            dialog.destroy()
+
+        def cancel():
+            dialog.destroy()
+
+        btn_row = tk.Frame(content, bg="#F7FFF9")
+        btn_row.pack(anchor="w")
+        ttk.Button(
+            btn_row, text="Confirm", style="Add.TButton", command=confirm, width=10
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            btn_row, text="Cancel", style="Update.TButton", command=cancel, width=10
+        ).pack(side="left")
+        entry.bind("<Return>", lambda e: confirm())
+        dialog.wait_window()
+        entered = result["value"]
+        if entered is None:
+            return
+        if entered == self.STUDENT_PASSKEY:
+            self.task_data_frame.tkraise()
+            self.load_tasks()
+            self.load_assignments()
         else:
             messagebox.showerror("Access Denied", "Incorrect passkey.")
 

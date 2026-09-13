@@ -116,14 +116,16 @@ GRADE_LEVELS = list(GRADE_SECTIONS.keys())
 
 
 class ModernDropdown(tk.Frame):
-    BORDER = "#003366"  # AdDU Navy Blue
-    BORDER_ACTIVE = "#198754"  # Professional Green for focus
-    TEXT = "#1A1A1A"
+    BORDER = "#DDE3EA"
+    BORDER_ACTIVE = "#10A37F"
+    TEXT = "#172033"
     PLACEHOLDER = "#6C757D"
     HOVER = "#E8F5E9"  # Very soft light green
     SELECTED = "#C8E6C9"  # Solid light green
-    ROW_HEIGHT = 28
-    MAX_VISIBLE_ROWS = 8
+    ARROW = "#10A37F"
+    ARROW_HOVER = "#087A64"
+    ROW_HEIGHT = 26
+    MAX_VISIBLE_ROWS = 4
 
     _active = None
 
@@ -140,7 +142,7 @@ class ModernDropdown(tk.Frame):
 
         self._label = tk.Label(
             inner,
-            text="",
+            text="Select an option",
             anchor="w",
             bg="white",
             fg=self.PLACEHOLDER,
@@ -155,19 +157,25 @@ class ModernDropdown(tk.Frame):
         self._arrow = tk.Label(
             inner,
             text="\u25be",
-            bg="white",
-            fg="#6B6B6B",
-            font=("Segoe UI", 10),
-            padx=8,
+            bg=self.ARROW,
+            fg="white",
+            font=("Segoe UI", 11, "bold"),
+            padx=6,
+            width=1,
+            anchor="center",
+            relief="flat",
+            bd=0,
             cursor="hand2",
         )
-        self._arrow.pack(side="right")
+        self._arrow.pack(side="right", fill="y")
 
         for w in (self, inner, self._label, self._arrow):
             w.bind("<Button-1>", self._toggle)
         for w in (self, inner, self._label, self._arrow):
             w.bind("<Enter>", lambda e: self.config(bg=self.BORDER_ACTIVE))
             w.bind("<Leave>", self._on_leave)
+        self._arrow.bind("<Enter>", lambda e: self._arrow.config(bg=self.ARROW_HOVER))
+        self._arrow.bind("<Leave>", lambda e: self._arrow.config(bg=self.ARROW))
 
         self._inner = inner
         self._render()
@@ -213,12 +221,13 @@ class ModernDropdown(tk.Frame):
         if self._value:
             self._label.config(text=self._value, fg=self.TEXT)
         else:
-            self._label.config(text="", fg=self.PLACEHOLDER)
+            self._label.config(text="Select an option", fg=self.PLACEHOLDER)
 
-    def _select(self, value, notify=True):
+    def _select(self, value, notify=True, close_popup=True):
         self._value = value
         self._render()
-        self._close_popup()
+        if close_popup:
+            self._close_popup()
         if notify:
             evt = SimpleNamespace(widget=self)
             for cb in list(self._callbacks):
@@ -240,15 +249,27 @@ class ModernDropdown(tk.Frame):
         self.config(bg=self.BORDER_ACTIVE)
 
         x = self.winfo_rootx()
-        y = self.winfo_rooty() + self.winfo_height()
+        top = self.winfo_rooty()
+        y = top + self.winfo_height()
         width = max(self.winfo_width(), 140)
         visible_rows = min(len(self._values), self.MAX_VISIBLE_ROWS)
         height = visible_rows * self.ROW_HEIGHT + 2
 
+        screen_height = self.winfo_screenheight()
+        space_below = max(screen_height - y - 8, self.ROW_HEIGHT + 2)
+        space_above = max(top - 8, self.ROW_HEIGHT + 2)
+        if y + height > screen_height and space_above > space_below:
+            height = min(height, space_above)
+            y = top - height
+        else:
+            height = min(height, space_below)
+
         popup = tk.Toplevel(self)
         popup.wm_overrideredirect(True)
+        popup.lift()
         popup.wm_geometry(f"{width}x{height}+{x}+{y}")
         popup.config(bg=self.BORDER_ACTIVE)
+        popup.grab_set()
         self._popup = popup
 
         frame = tk.Frame(popup, bg="white")
@@ -258,12 +279,79 @@ class ModernDropdown(tk.Frame):
         canvas = tk.Canvas(frame, bg="white", highlightthickness=0)
         canvas.pack(side="left", fill="both", expand=True)
         list_frame = tk.Frame(canvas, bg="white")
-        canvas.create_window((0, 0), window=list_frame, anchor="nw", width=width - 2)
 
         if needs_scroll:
-            scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
-            scrollbar.pack(side="right", fill="y")
-            canvas.configure(yscrollcommand=scrollbar.set)
+            scrollbar_track = tk.Frame(frame, bg="white", width=16)
+            scrollbar_track.place(
+                relx=1.0, rely=0, relwidth=16 / width, relheight=1, anchor="ne"
+            )
+            scrollbar = tk.Canvas(
+                scrollbar_track,
+                width=16,
+                bg="white",
+                highlightthickness=0,
+                bd=0,
+            )
+            scrollbar.pack(fill="both", expand=True)
+
+            def update_scrollbar(first, last):
+                scrollbar.delete("thumb")
+                track_height = max(scrollbar.winfo_height(), 1)
+                track_top = 2
+                track_bottom = max(track_top + 24, track_height - 2)
+                first_y = track_top + int(float(first) * (track_bottom - track_top))
+                last_y = track_top + int(float(last) * (track_bottom - track_top))
+                if last_y - first_y < 24:
+                    last_y = min(track_bottom, first_y + 24)
+                first_y = max(track_top, min(first_y, track_bottom - 24))
+                last_y = max(first_y + 24, min(last_y, track_bottom))
+                scrollbar.create_rectangle(
+                    3,
+                    first_y,
+                    13,
+                    last_y,
+                    fill="#10A37F",
+                    outline="#087A64",
+                    tags="thumb",
+                )
+
+            drag_state = {"offset": None}
+
+            def scroll_from_click(event):
+                scrollbar_height = max(scrollbar.winfo_height(), 1)
+                thumb = scrollbar.bbox("thumb")
+                if thumb and thumb[1] <= event.y <= thumb[3]:
+                    drag_state["offset"] = event.y - thumb[1]
+                else:
+                    drag_state["offset"] = None
+                    canvas.yview_moveto(max(0, min(1, event.y / scrollbar_height)))
+
+            def drag_scrollbar(event):
+                if drag_state["offset"] is None:
+                    return
+                scrollbar_height = max(scrollbar.winfo_height(), 1)
+                thumb = scrollbar.bbox("thumb")
+                if not thumb:
+                    return
+                thumb_height = thumb[3] - thumb[1]
+                target = event.y - drag_state["offset"]
+                max_top = max(scrollbar_height - thumb_height, 1)
+                canvas.yview_moveto(max(0, min(1, target / max_top)))
+
+            def stop_drag(event=None):
+                drag_state["offset"] = None
+
+            scrollbar.bind("<Button-1>", scroll_from_click)
+            scrollbar.bind("<B1-Motion>", drag_scrollbar)
+            scrollbar.bind("<ButtonRelease-1>", stop_drag)
+            canvas.configure(yscrollcommand=update_scrollbar)
+
+        canvas.create_window(
+            (0, 0),
+            window=list_frame,
+            anchor="nw",
+            width=width - (20 if needs_scroll else 0),
+        )
 
         def on_wheel(event):
             delta = 1 if getattr(event, "num", None) == 5 or event.delta < 0 else -1
@@ -276,9 +364,9 @@ class ModernDropdown(tk.Frame):
                 anchor="w",
                 bg="white",
                 fg=self.TEXT,
-                font=("Segoe UI", 10),
+                font=("Segoe UI", 9),
                 padx=10,
-                pady=6,
+                pady=3,
                 cursor="hand2",
             )
             row.pack(fill="x")
@@ -296,7 +384,10 @@ class ModernDropdown(tk.Frame):
                     bg=self.SELECTED if v == self._value else "white"
                 ),
             )
-            row.bind("<Button-1>", lambda e, v=val: self._select(v))
+            row.bind(
+                "<Button-1>",
+                lambda e, v=val: self._select_from_popup(v),
+            )
             for w in (canvas, list_frame, row):
                 w.bind("<MouseWheel>", on_wheel)
                 w.bind("<Button-4>", on_wheel)
@@ -304,10 +395,27 @@ class ModernDropdown(tk.Frame):
 
         list_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
+        if needs_scroll:
+            scrollbar.create_rectangle(
+                3,
+                2,
+                13,
+                max(24, scrollbar.winfo_height() - 2),
+                fill="#10A37F",
+                outline="#087A64",
+                tags="thumb",
+            )
+            scrollbar.after_idle(lambda: update_scrollbar(*canvas.yview()))
 
         self._click_id = self.winfo_toplevel().bind_all(
             "<Button-1>", self._on_global_click, add="+"
         )
+
+    def _select_from_popup(self, value):
+        self._select(value, close_popup=False)
+        if self._popup is not None:
+            self._popup.after_idle(self._close_popup)
+        return "break"
 
     def _on_global_click(self, event):
         if self._popup is None:
@@ -329,6 +437,10 @@ class ModernDropdown(tk.Frame):
 
     def _close_popup(self):
         if self._popup is not None:
+            try:
+                self._popup.grab_release()
+            except tk.TclError:
+                pass
             self._popup.destroy()
             self._popup = None
         if ModernDropdown._active is self:
@@ -353,8 +465,8 @@ class ModernComboBox(ctk.CTkComboBox):
         kwargs.setdefault("border_width", 1)
         kwargs.setdefault("border_color", "#DDE3EA")
         kwargs.setdefault("fg_color", "#FFFFFF")
-        kwargs.setdefault("button_color", "#BFE5D8")
-        kwargs.setdefault("button_hover_color", "#9ED8C5")
+        kwargs.setdefault("button_color", "#10A37F")
+        kwargs.setdefault("button_hover_color", "#087A64")
         kwargs.setdefault("dropdown_fg_color", "#FFFFFF")
         kwargs.setdefault("dropdown_hover_color", "#E8F5F1")
         kwargs.setdefault("dropdown_text_color", "#172033")
@@ -366,6 +478,16 @@ class ModernComboBox(ctk.CTkComboBox):
         kwargs["command"] = self._notify_selection
         super().__init__(master, width=max(180, width * 10), values=values or [], **kwargs)
         super().set(self._placeholder)
+        if state == "readonly":
+            self._entry.bind(
+                "<Key>", lambda event: "break", add="+"
+            )
+            self._entry.bind(
+                "<<Paste>>", lambda event: "break", add="+"
+            )
+            self._entry.bind(
+                "<<Cut>>", lambda event: "break", add="+"
+            )
 
     def _notify_selection(self, _value=None):
         event = SimpleNamespace(widget=self)
@@ -437,10 +559,6 @@ class ModernButton(ctk.CTkButton):
     config = ctk.CTkButton.configure
 
 
-# Existing business logic uses this name; the implementation is now CTk-native.
-ModernDropdown = ModernComboBox
-
-
 class AshscomGUI:
     STUDENT_PASSKEY = "ashscom2026"
     ACTION_PIN = "1835"
@@ -490,6 +608,25 @@ class AshscomGUI:
         style.configure("Card.TFrame", background=CARD_BG)
         style.configure("TLabelframe", background=CARD_BG, bordercolor=self.THEME["border"], relief="solid", borderwidth=1)
         style.configure("TLabel", background=BG_COLOR, font=("Segoe UI", 10), foreground=TEXT)
+        style.configure(
+            "Form.TLabel",
+            background=CARD_BG,
+            foreground=TEXT,
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.configure(
+            "Student.TLabelframe",
+            background=CARD_BG,
+            bordercolor=self.THEME["border"],
+            relief="solid",
+            borderwidth=1,
+        )
+        style.configure(
+            "Student.TLabelframe.Label",
+            background=CARD_BG,
+            foreground=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+        )
 
         style.configure(
             "TLabelframe.Label",
@@ -628,13 +765,13 @@ class AshscomGUI:
         self.root.option_add("*Entry.selectBackground", "#D4FFD9")
         self.root.option_add("*Entry.selectForeground", "#004202")
 
-        header_canvas = tk.Canvas(self.root, height=96, highlightthickness=0, bg=ADDU_BLUE)
+        header_canvas = tk.Canvas(self.root, height=112, highlightthickness=0, bg="#24551B")
         header_canvas.pack(fill="x")
 
-        logo1_img = Image.open("ateneo1.png").resize((62, 62))
+        logo1_img = Image.open("ateneo1.png").resize((58, 58))
         self.logo1 = ImageTk.PhotoImage(logo1_img)
 
-        logo2_img = Image.open("ashscom.png").resize((80, 80))
+        logo2_img = Image.open("ashscom.png").resize((70, 70))
         self.logo2 = ImageTk.PhotoImage(logo2_img)
 
         # Modernized scrollbars
@@ -668,7 +805,7 @@ class AshscomGUI:
 
         def redraw_header(event):
             width = max(1, event.width)
-            height = 96
+            height = 112
             header_canvas.delete("all")
 
             def mix(c1, c2, ratio):
@@ -681,40 +818,50 @@ class AshscomGUI:
 
             for i in range(height):
                 ratio = i / max(1, height - 1)
-                color = mix(ADDU_BLUE_DARK, ADDU_BLUE, ratio)
+                color = mix("#173B16", "#24551B", ratio)
                 header_canvas.create_line(0, i, width, i, fill=color, width=1)
 
-            header_canvas.create_image(26, 48, image=self.logo1, anchor="w")
-            header_canvas.create_image(96, 48, image=self.logo2, anchor="w")
+            header_canvas.create_rectangle(0, height - 3, width, height, fill="#437118", outline="")
+            header_canvas.create_image(24, 56, image=self.logo1, anchor="w")
+            header_canvas.create_image(88, 56, image=self.logo2, anchor="w")
+            header_canvas.create_line(
+                174, 24, 174, 88, fill="#AFDD6E", width=1
+            )
 
             header_canvas.create_text(
                 width - 18,
-                27,
+                30,
                 text="Ateneo De Davao University Senior High School",
-                font=("Segoe UI", 12, "bold"),
-                fill="#eef8ff",
+                font=("Segoe UI", 16, "bold"),
+                fill="#F5F3D8",
                 anchor="e",
             )
             header_canvas.create_text(
                 width - 18,
-                48,
+                54,
                 text="Commission on Elections",
-                font=("Segoe UI", 12, "bold"),
-                fill="#eef8ff",
+                font=("Segoe UI", 15, "bold"),
+                fill="#F5F3D8",
                 anchor="e",
             )
             header_canvas.create_text(
                 width - 18,
-                74,
+                84,
                 text="ASHSCOM MANAGEMENT SYSTEM",
-                font=("Segoe UI", 18, "bold"),
-                fill=ADDU_GOLD,
+                font=("Segoe UI", 22, "bold"),
+                fill="#AFDD6E",
                 anchor="e",
             )
 
         header_canvas.bind("<Configure>", redraw_header)
 
-        divider = tk.Frame(self.root, bg=ACTION_GREEN, height=3)
+        header_nav = ctk.CTkFrame(
+            self.root, fg_color="#173B16", height=62, corner_radius=0
+        )
+        header_nav.pack(fill="x")
+        header_nav.pack_propagate(False)
+
+        divider = tk.Frame(self.root, bg="#437118", height=3)
         divider.pack(fill="x")
 
         # Create a connection to the database
@@ -727,29 +874,8 @@ class AshscomGUI:
         body_frame = ctk.CTkFrame(self.root, fg_color=BG_COLOR, corner_radius=0)
         body_frame.pack(expand=True, fill="both")
 
-        sidebar = ctk.CTkFrame(body_frame, fg_color=ADDU_BLUE_DARK, width=232, corner_radius=0)
-        sidebar.pack(side="left", fill="y")
-        sidebar.pack_propagate(False)
-
-        sidebar_top = ctk.CTkFrame(sidebar, fg_color="transparent", corner_radius=0)
-        sidebar_top.pack(fill="x")
-        ctk.CTkLabel(
-            sidebar_top,
-            text="ASHSCOM",
-            text_color="#FFFFFF",
-            font=("Segoe UI", 22, "bold"),
-            anchor="w",
-        ).pack(fill="x", padx=22, pady=(28, 2))
-        ctk.CTkLabel(
-            sidebar_top,
-            text="Management System",
-            text_color="#9FC4D6",
-            font=("Segoe UI", 10),
-            anchor="w",
-        ).pack(fill="x", padx=22, pady=(0, 28))
-
         content_frame = ctk.CTkFrame(body_frame, fg_color=BG_COLOR, corner_radius=0)
-        content_frame.pack(side="right", expand=True, fill="both")
+        content_frame.pack(expand=True, fill="both")
 
         content_frame.grid_rowconfigure(0, weight=1)
         content_frame.grid_columnconfigure(0, weight=1)
@@ -763,48 +889,57 @@ class AshscomGUI:
             self.pages[name].tkraise()
             self.nav_buttons_active = name
             for key, b in self.nav_buttons.items():
-                b.configure(fg_color=ADDU_BLUE_DARK, text_color="#D8E5EE")
-                self.nav_accents[key].configure(fg_color=ADDU_BLUE_DARK)
-            self.nav_buttons[name].configure(fg_color="#123E64", text_color="#FFFFFF")
-            self.nav_accents[name].configure(fg_color=ACTION_GREEN)
+                b.configure(fg_color="#173B16", text_color="#E8F5D0")
+                self.nav_accents[key].configure(fg_color="#173B16")
+            self.nav_buttons[name].configure(fg_color="#10A37F", text_color="#FFFFFF")
+            self.nav_accents[name].configure(fg_color="#AFDD6E")
 
         nav_buttons = [
             ("Students", "students"),
             ("Add Student / Tasks", "add_student"),
             ("Tasks & Assignments", "task/assignment"),
         ]
+        ctk.CTkLabel(
+            header_nav,
+            text="WORKSPACE",
+            text_color="#87AECE",
+            font=("Segoe UI", 11, "bold"),
+            anchor="w",
+        ).pack(side="left", padx=(28, 22), pady=0)
+        nav_frame = ctk.CTkFrame(header_nav, fg_color="transparent", corner_radius=0)
+        nav_frame.pack(side="left", fill="y")
         for label, key in nav_buttons:
-            row = ctk.CTkFrame(sidebar, fg_color="transparent", corner_radius=0)
-            row.pack(fill="x")
+            row = ctk.CTkFrame(nav_frame, fg_color="transparent", corner_radius=0)
+            row.pack(side="left", fill="y", padx=(0, 8))
 
-            accent = ctk.CTkFrame(row, fg_color=ADDU_BLUE_DARK, width=4, height=44, corner_radius=2)
-            accent.pack(side="left", fill="y", padx=(14, 9), pady=5)
+            accent = ctk.CTkFrame(row, fg_color="#173B16", width=5, height=44, corner_radius=2)
+            accent.pack(side="left", fill="y", padx=(0, 6), pady=9)
             self.nav_accents[key] = accent
 
             btn = ctk.CTkButton(
                 row,
                 text=label,
-                font=("Segoe UI", 10, "bold"),
-                fg_color=ADDU_BLUE_DARK,
-                hover_color="#123E64",
-                text_color="#D8E5EE",
-                corner_radius=10,
-                anchor="w",
+                font=("Segoe UI", 13, "bold"),
+                fg_color="#173B16",
+                hover_color="#24551B",
+                text_color="#E8F5D0",
+                corner_radius=8,
+                anchor="center",
                 height=44,
                 cursor="hand2",
-                width=170,
+                width=180,
                 command=lambda k=key: show_page(k),
             )
-            btn.pack(side="left", fill="x", expand=True, padx=(0, 14), pady=5)
+            btn.pack(side="left", fill="y", padx=(0, 0), pady=9)
             self.nav_buttons[key] = btn
 
             def on_enter(e, k=key):
                 if self.nav_buttons_active != k:
-                    self.nav_buttons[k].configure(fg_color="#123E64")
+                    self.nav_buttons[k].configure(fg_color="#24551B")
 
             def on_leave(e, k=key):
                 if self.nav_buttons_active != k:
-                    self.nav_buttons[k].configure(fg_color=ADDU_BLUE_DARK)
+                    self.nav_buttons[k].configure(fg_color="#173B16")
 
             btn.bind("<Enter>", on_enter)
             btn.bind("<Leave>", on_leave)
@@ -1071,20 +1206,35 @@ class AshscomGUI:
             pass
 
     def create_students_tab(self, parent):
-        settings_frame = ctk.CTkFrame(parent, fg_color=self.THEME["background"], corner_radius=0)
+        settings_frame = ctk.CTkFrame(parent, fg_color=self.THEME["card"], corner_radius=0)
         settings_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["students"] = settings_frame
 
-        overview_frame = ttk.LabelFrame(settings_frame, text="Student Management")
-        overview_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        overview_frame = tk.Frame(
+            settings_frame,
+            bg="white",
+            padx=10,
+            pady=10,
+        )
+        overview_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        overview_frame.columnconfigure(0, weight=0)
-        overview_frame.columnconfigure(1, weight=1)
+        overview_frame.columnconfigure(0, weight=1, minsize=460)
+        overview_frame.columnconfigure(1, weight=2, minsize=520)
         overview_frame.rowconfigure(0, weight=1)
 
         # --- LEFT: Edit form ---
-        form_frame = ttk.LabelFrame(overview_frame, text="Update Student")
-        form_frame.grid(row=0, column=0, sticky="new", padx=(10, 5), pady=(10, 11))
+        form_frame = tk.LabelFrame(
+            overview_frame,
+            text="Update Student",
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
+            padx=10,
+            pady=10,
+        )
+        form_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=(10, 11))
 
         # inline grid layout — labels left, fields right (matches Add Student tab)
         # Fixed label-column width + identical field width/padding/pady on every
@@ -1095,13 +1245,20 @@ class AshscomGUI:
         ROW_PADY = 6
 
         # --- Form fields ---
-        ttk.Label(form_frame, text="Student Name:").grid(
+        ttk.Label(form_frame, text="Student Name:", style="Form.TLabel").grid(
             row=0, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
-        self.edit_name_entry = ctk.CTkEntry(form_frame, width=220, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.edit_name_entry = ctk.CTkEntry(
+            form_frame,
+            width=220,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="e.g. Juan Dela Cruz",
+        )
         self.edit_name_entry.grid(row=0, column=1, padx=10, pady=ROW_PADY, sticky="ew")
 
-        ttk.Label(form_frame, text="Grade Level:").grid(
+        ttk.Label(form_frame, text="Grade Level:", style="Form.TLabel").grid(
             row=1, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
         self.edit_grade_entry = ModernDropdown(
@@ -1110,7 +1267,7 @@ class AshscomGUI:
         self.edit_grade_entry.grid(row=1, column=1, padx=10, pady=ROW_PADY, sticky="ew")
         self.edit_grade_combo = self.edit_grade_entry
 
-        ttk.Label(form_frame, text="Section:").grid(
+        ttk.Label(form_frame, text="Section:", style="Form.TLabel").grid(
             row=2, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
         self.edit_section_entry = ModernDropdown(
@@ -1131,16 +1288,23 @@ class AshscomGUI:
             "<<ComboboxSelected>>", self._clear_combo_highlight
         )
 
-        ttk.Label(form_frame, text="Addu Email:").grid(
+        ttk.Label(form_frame, text="Addu Email:", style="Form.TLabel").grid(
             row=3, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
-        email_row = ttk.Frame(form_frame)
+        email_row = tk.Frame(form_frame, bg="white")
         email_row.grid(row=3, column=1, padx=10, pady=ROW_PADY, sticky="ew")
-        self.edit_email_entry = ctk.CTkEntry(email_row, width=150, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.edit_email_entry = ctk.CTkEntry(
+            email_row,
+            width=150,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="username",
+        )
         self.edit_email_entry.pack(side="left")
-        ttk.Label(email_row, text="@addu.edu.ph").pack(side="left")
+        ttk.Label(email_row, text="@addu.edu.ph", style="Form.TLabel").pack(side="left")
 
-        ttk.Label(form_frame, text="Committee:").grid(
+        ttk.Label(form_frame, text="Committee:", style="Form.TLabel").grid(
             row=4, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
         self.edit_committee_combo = ModernDropdown(
@@ -1151,7 +1315,7 @@ class AshscomGUI:
             row=4, column=1, padx=10, pady=ROW_PADY, sticky="ew"
         )
 
-        ttk.Label(form_frame, text="Role:").grid(
+        ttk.Label(form_frame, text="Role:", style="Form.TLabel").grid(
             row=5, column=0, padx=10, pady=ROW_PADY, sticky="w"
         )
         self.edit_role_combo = ModernDropdown(
@@ -1177,45 +1341,50 @@ class AshscomGUI:
             "<<ComboboxSelected>>", self._clear_combo_highlight
         )
         self.edit_role_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
+        form_frame.rowconfigure(6, weight=0)
+        button_row = tk.Frame(form_frame, bg="white")
+        button_row.grid(row=7, column=0, columnspan=2, pady=(28, 12))
 
         self.update_btn = ModernButton(
-            form_frame,
+            button_row,
             text="🔼 Update Selected",
             style="Update.TButton",
             command=self.update_student,
             state="disabled",
+            width=140,
+            height=38,
         )
-        self.update_btn.grid(
-            row=6, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
-        )
+        self.update_btn.pack(side="left", padx=(0, 8))
 
         self.delete_btn = ModernButton(
-            form_frame,
+            button_row,
             text="🗑 Delete Selected",
             style="Delete.TButton",
             command=self.delete_student,
             state="disabled",
+            width=140,
+            height=38,
         )
-        self.delete_btn.grid(
-            row=7, column=0, columnspan=2, padx=10, pady=(0, 4), sticky="ew"
-        )
+        self.delete_btn.pack(side="left")
 
         # --- RIGHT: View switcher + single table ---
-        right_col = ttk.Frame(overview_frame)
-        right_col.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
+        right_col = tk.Frame(overview_frame, bg="white")
+        right_col.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=(10, 11))
         right_col.rowconfigure(0, weight=1)
         right_col.columnconfigure(0, weight=1)
 
         # Lock screen - shown by default
-        self.lock_frame = ttk.Frame(right_col)
+        self.lock_frame = tk.Frame(right_col, bg="white")
         self.lock_frame.grid(row=0, column=0, sticky="nsew")
 
-        lock_inner = ttk.Frame(self.lock_frame)
+        lock_inner = tk.Frame(self.lock_frame, bg="white")
         lock_inner.place(relx=0.5, rely=0.4, anchor="center")
-        ttk.Label(lock_inner, text="🔒", font=("Segoe UI", 40)).pack(pady=(0, 10))
-        ttk.Label(
+        tk.Label(lock_inner, text="🔒", bg="white", font=("Segoe UI", 40)).pack(pady=(0, 10))
+        tk.Label(
             lock_inner,
             text="Student records are protected.",
+            bg="white",
+            fg=self.THEME["text"],
             font=("Segoe UI", 11, "bold"),
         ).pack(pady=(0, 15))
         ModernButton(
@@ -1226,13 +1395,13 @@ class AshscomGUI:
         ).pack()
 
         # Data screen - hidden until unlocked
-        self.data_frame = ttk.Frame(right_col)
+        self.data_frame = tk.Frame(right_col, bg="white")
         self.data_frame.grid(row=0, column=0, sticky="nsew")
 
-        view_row = ttk.Frame(self.data_frame)
+        view_row = tk.Frame(self.data_frame, bg="white")
         view_row.pack(fill="x", padx=8, pady=(10, 8))
 
-        ttk.Label(view_row, text="Show:", font=("Segoe UI", 10, "bold")).pack(
+        tk.Label(view_row, text="Show:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).pack(
             side="left", padx=(0, 5)
         )
         self.view_combo = ModernDropdown(
@@ -1253,10 +1422,12 @@ class AshscomGUI:
             lambda e: (self.refresh_table_view(), self._clear_combo_highlight(e)),
         )
 
+        tk.Label(view_row, text="🔍", bg="white", fg=self.THEME["text"], font=("Segoe UI", 12)).pack(
+            side="left", padx=(0, 6)
+        )
         self.search_var = tk.StringVar()
         search_entry = ctk.CTkEntry(
             view_row,
-            textvariable=self.search_var,
             height=40,
             corner_radius=10,
             border_width=1,
@@ -1268,6 +1439,9 @@ class AshscomGUI:
             font=("Segoe UI", 11),
         )
         search_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        search_entry.bind(
+            "<KeyRelease>", lambda e: self.search_var.set(search_entry.get())
+        )
         self.search_var.trace_add("write", lambda *args: self.refresh_table_view())
 
         self.student_tree = self._build_student_tree(self.data_frame)
@@ -1278,7 +1452,7 @@ class AshscomGUI:
         self.lock_frame.tkraise()
 
     def create_tasks_assignments_tab(self, parent):
-        settings_frame = ctk.CTkFrame(parent, fg_color=self.THEME["background"], corner_radius=0)
+        settings_frame = ctk.CTkFrame(parent, fg_color=self.THEME["card"], corner_radius=0)
         settings_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["tasks/assignments"] = settings_frame
 
@@ -1305,29 +1479,28 @@ class AshscomGUI:
             border_width=1,
             border_color=self.THEME["border"],
         )
-        tree_frame.pack(fill="both", expand=True, padx=8, pady=(0, 13))
+        tree_frame.pack(fill="both", expand=True, padx=8, pady=0)
 
         tree_scroll_y = ctk.CTkScrollbar(
             tree_frame,
             orientation="vertical",
-            width=14,
-            corner_radius=7,
-            fg_color="#E6EDF2",
-            button_color="#9FB0BE",
+            width=12,
+            corner_radius=6,
+            fg_color="#DDE6EC",
+            button_color="#7893A3",
             button_hover_color=self.THEME["green"],
         )
-        tree_scroll_y.pack(side="right", fill="y", padx=(0, 6), pady=6)
+        tree_scroll_y.pack(side="right", fill="y", padx=(2, 6), pady=6)
         tree_scroll_x = ctk.CTkScrollbar(
             tree_frame,
             orientation="horizontal",
-            height=14,
-            corner_radius=7,
-            fg_color="#E6EDF2",
-            button_color="#9FB0BE",
+            height=12,
+            corner_radius=6,
+            fg_color="#DDE6EC",
+            button_color="#7893A3",
             button_hover_color=self.THEME["green"],
         )
         tree_scroll_x.pack(side="bottom", fill="x", padx=6, pady=(0, 6))
-
         tree = ttk.Treeview(
             tree_frame,
             yscrollcommand=tree_scroll_y.set,
@@ -1338,6 +1511,15 @@ class AshscomGUI:
         tree.pack(fill="both", expand=True, padx=6, pady=6)
         tree_scroll_y.configure(command=tree.yview)
         tree_scroll_x.configure(command=tree.xview)
+        self.no_results_label = tk.Label(
+            tree_frame,
+            text="No results found.",
+            bg="white",
+            fg=self.THEME["muted"],
+            font=("Segoe UI", 11, "italic"),
+        )
+        self.no_results_label.place(relx=0.5, rely=0.5, anchor="center")
+        self.no_results_label.lower()
 
         tree["columns"] = (
             "id",
@@ -1350,24 +1532,40 @@ class AshscomGUI:
         )
 
         tree.column("#0", width=0, stretch=tk.NO)
-        tree.column("id", width=50, anchor=tk.CENTER, stretch=False)
-        tree.column("name", width=200, anchor=tk.W, stretch=False)
-        tree.column("grade_level", width=80, anchor=tk.CENTER, stretch=False)
-        tree.column("section", width=100, anchor=tk.CENTER, stretch=False)
-        tree.column("addu_email", width=220, anchor=tk.W, stretch=False)
-        tree.column("committee", width=140, anchor=tk.W, stretch=False)
-        tree.column("role", width=180, anchor=tk.W, stretch=False)
+        student_column_widths = {
+            "id": (50, 40),
+            "name": (110, 90),
+            "grade_level": (85, 70),
+            "section": (120, 120),
+            "addu_email": (220, 170),
+            "committee": (130, 100),
+            "role": (220, 180),
+        }
+        for column, (width, minwidth) in student_column_widths.items():
+            tree.column(
+                column,
+                width=width,
+                minwidth=minwidth,
+                anchor=tk.CENTER,
+                stretch=column != "section",
+            )
 
         tree.heading("id", text="ID", anchor=tk.CENTER)
-        tree.heading("name", text="Name", anchor=tk.W)
+        tree.heading("name", text="Name", anchor=tk.CENTER)
         tree.heading("grade_level", text="Grade", anchor=tk.CENTER)
         tree.heading("section", text="Section", anchor=tk.CENTER)
-        tree.heading("addu_email", text="Email", anchor=tk.W)
-        tree.heading("committee", text="Committee", anchor=tk.W)
-        tree.heading("role", text="Role", anchor=tk.W)
+        tree.heading("addu_email", text="Email", anchor=tk.CENTER)
+        tree.heading("committee", text="Committee", anchor=tk.CENTER)
+        tree.heading("role", text="Role", anchor=tk.CENTER)
 
         tree.tag_configure("evenrow", background="#FFFFFF")
         tree.tag_configure("oddrow", background="#F8FAFC")
+        tree.tag_configure(
+            "no_results",
+            background="#FFFFFF",
+            foreground=self.THEME["muted"],
+            font=("Segoe UI", 11, "italic"),
+        )
         return tree
 
     def _build_task_tree(self, parent):
@@ -1383,8 +1581,8 @@ class AshscomGUI:
         tree_scroll_y = ctk.CTkScrollbar(
             tree_frame,
             orientation="vertical",
-            width=14,
-            corner_radius=7,
+            width=12,
+            corner_radius=6,
             fg_color="#E6EDF2",
             button_color="#9FB0BE",
             button_hover_color=self.THEME["green"],
@@ -1393,8 +1591,8 @@ class AshscomGUI:
         tree_scroll_x = ctk.CTkScrollbar(
             tree_frame,
             orientation="horizontal",
-            height=14,
-            corner_radius=7,
+            height=12,
+            corner_radius=6,
             fg_color="#E6EDF2",
             button_color="#9FB0BE",
             button_hover_color=self.THEME["green"],
@@ -1411,17 +1609,25 @@ class AshscomGUI:
         tree.pack(fill="both", expand=True, padx=6, pady=6)
         tree_scroll_y.configure(command=tree.yview)
         tree_scroll_x.configure(command=tree.xview)
-
+        self.task_no_results_label = tk.Label(
+            tree_frame,
+            text="No results found.",
+            bg="white",
+            fg=self.THEME["muted"],
+            font=("Segoe UI", 11, "italic"),
+        )
+        self.task_no_results_label.place(relx=0.5, rely=0.5, anchor="center")
+        self.task_no_results_label.lower()
         tree["columns"] = ("id", "task_name", "committee", "due_date")
         tree.column("#0", width=0, stretch=tk.NO)
-        tree.column("id", width=50, anchor=tk.CENTER, stretch=True)
-        tree.column("task_name", width=300, anchor=tk.W, stretch=True)
-        tree.column("committee", width=200, anchor=tk.W, stretch=True)
+        tree.column("id", width=50, anchor=tk.CENTER, stretch=False)
+        tree.column("task_name", width=220, anchor=tk.CENTER, stretch=False)
+        tree.column("committee", width=220, anchor=tk.CENTER, stretch=False)
         tree.column("due_date", width=140, anchor=tk.CENTER, stretch=True)
 
         tree.heading("id", text="ID", anchor=tk.CENTER)
-        tree.heading("task_name", text="Task Name", anchor=tk.W)
-        tree.heading("committee", text="Committee", anchor=tk.W)
+        tree.heading("task_name", text="Task Name", anchor=tk.CENTER)
+        tree.heading("committee", text="Committee", anchor=tk.CENTER)
         tree.heading("due_date", text="Due Date", anchor=tk.CENTER)
 
         tree.tag_configure("evenrow", background="#FFFFFF")
@@ -1429,21 +1635,39 @@ class AshscomGUI:
         return tree
 
     def create_add_student_tab(self, parent):
-        students_frame = ctk.CTkFrame(parent, fg_color=self.THEME["background"], corner_radius=0)
+        students_frame = ctk.CTkFrame(parent, fg_color=self.THEME["card"], corner_radius=0)
         students_frame.grid(row=0, column=0, sticky="nsew")
         self.pages["add_student"] = students_frame
 
-        container = ttk.Frame(students_frame)
+        container = tk.Frame(students_frame, bg="white")
         container.pack(fill="both", expand=True, padx=15, pady=15)
-        container.columnconfigure(0, weight=1)
-        container.columnconfigure(1, weight=1)
+        container.columnconfigure(0, weight=1, minsize=360)
+        container.columnconfigure(1, weight=1, minsize=360)
+        container.columnconfigure(2, weight=1, minsize=360)
         container.rowconfigure(0, weight=1)
 
         # --- Add Student section (left) ---
-        add_student_frame = ttk.LabelFrame(container, text="Add Student")
+        add_student_frame = tk.LabelFrame(
+            container,
+            text="Add Student",
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
+        )
         add_student_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=5)
 
-        entry_frame = ttk.Frame(add_student_frame)
+        tk.Label(
+            add_student_frame,
+            text="Enter the student's details and assign a role.",
+            bg="white",
+            fg=self.THEME["muted"],
+            font=("Segoe UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=10, pady=(8, 0))
+
+        entry_frame = tk.Frame(add_student_frame, bg="white")
         entry_frame.pack(fill="x", padx=10, pady=(10, 5))
         # Grid-aligned: same 2-col grid as Update Student — fixes uneven padx/sticky
         entry_frame.columnconfigure(0, weight=0, minsize=110)
@@ -1452,13 +1676,20 @@ class AshscomGUI:
         _PY = 6
 
         # --- Form fields ---
-        ttk.Label(entry_frame, text="Student Name:").grid(
+        ttk.Label(entry_frame, text="Student Name:", style="Form.TLabel").grid(
             row=0, column=0, padx=10, pady=_PY, sticky="w"
         )
-        self.name_entry = ctk.CTkEntry(entry_frame, width=220, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.name_entry = ctk.CTkEntry(
+            entry_frame,
+            width=220,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="e.g. Juan Dela Cruz",
+        )
         self.name_entry.grid(row=0, column=1, padx=10, pady=_PY, sticky="ew")
 
-        ttk.Label(entry_frame, text="Grade Level:").grid(
+        ttk.Label(entry_frame, text="Grade Level:", style="Form.TLabel").grid(
             row=1, column=0, padx=10, pady=_PY, sticky="w"
         )
         self.grade_entry = ModernDropdown(
@@ -1467,7 +1698,7 @@ class AshscomGUI:
         self.grade_entry.grid(row=1, column=1, padx=10, pady=_PY, sticky="ew")
         self.grade_combo = self.grade_entry
 
-        ttk.Label(entry_frame, text="Section:").grid(
+        ttk.Label(entry_frame, text="Section:", style="Form.TLabel").grid(
             row=2, column=0, padx=10, pady=_PY, sticky="w"
         )
         self.section_entry = ModernDropdown(entry_frame, width=_FW, state="readonly")
@@ -1480,23 +1711,30 @@ class AshscomGUI:
         )
         self.section_entry.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
 
-        ttk.Label(entry_frame, text="Addu Email:").grid(
+        ttk.Label(entry_frame, text="Addu Email:", style="Form.TLabel").grid(
             row=3, column=0, padx=10, pady=_PY, sticky="w"
         )
-        email_row = ttk.Frame(entry_frame)
+        email_row = tk.Frame(entry_frame, bg="white")
         email_row.grid(row=3, column=1, padx=10, pady=_PY, sticky="ew")
-        self.email_entry = ctk.CTkEntry(email_row, width=150, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.email_entry = ctk.CTkEntry(
+            email_row,
+            width=150,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="username",
+        )
         self.email_entry.pack(side="left")
-        ttk.Label(email_row, text="@addu.edu.ph").pack(side="left")
+        ttk.Label(email_row, text="@addu.edu.ph", style="Form.TLabel").pack(side="left")
 
-        ttk.Label(entry_frame, text="Committee:").grid(
+        ttk.Label(entry_frame, text="Committee:", style="Form.TLabel").grid(
             row=4, column=0, padx=10, pady=_PY, sticky="w"
         )
         self.committee_combo = ModernDropdown(entry_frame, width=_FW, state="readonly")
         self.committee_combo["values"] = self.load_committees()
         self.committee_combo.grid(row=4, column=1, padx=10, pady=_PY, sticky="ew")
 
-        ttk.Label(entry_frame, text="Role:").grid(
+        ttk.Label(entry_frame, text="Role:", style="Form.TLabel").grid(
             row=5, column=0, padx=10, pady=_PY, sticky="w"
         )
         self.role_combo = ModernDropdown(
@@ -1518,7 +1756,7 @@ class AshscomGUI:
         )
         self.role_combo.grid(row=5, column=1, padx=10, pady=_PY, sticky="ew")
 
-        button_frame = ttk.Frame(add_student_frame, style="Card.TFrame")
+        button_frame = tk.Frame(add_student_frame, bg="white")
         button_frame.pack(fill="x", padx=10, pady=(5, 10))
 
         self.committee_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
@@ -1528,63 +1766,88 @@ class AshscomGUI:
             button_frame,
             text="+ Add Student",
             style="Add.TButton",
-            command=self.add_student,
-        ).pack(side="left", padx=8, ipadx=0)
+            command=lambda: self.add_student(button_requested=True),
+        ).pack(side="left", padx=(126, 0), ipadx=0)
 
-        # --- Assign Tasks section (right) - Modern card ---
-        assign_tasks_frame = ttk.LabelFrame(container, text="Assign Tasks")
-        assign_tasks_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=5)
+        # --- Assign Task section (center) ---
+        assign_tasks_frame = tk.LabelFrame(
+            container,
+            text="Assign Task",
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
+        )
+        assign_tasks_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
+        assign_task_description = tk.Frame(assign_tasks_frame, bg="white")
+        assign_task_description.pack(fill="x", padx=10, pady=(8, 0))
+        tk.Label(
+            assign_task_description,
+            text="Create a task and set its committee and due date.",
+            bg="white",
+            fg=self.THEME["muted"],
+            font=("Segoe UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=10, pady=(8, 0))
+
+        assign_task_content = tk.Frame(assign_tasks_frame, bg="white")
+        assign_task_content.pack(fill="both", expand=True, padx=10, pady=(4, 10))
 
         # Single grid block for all 10 rows — labels col0, fields col1, uniform
-        assign_tasks_frame.columnconfigure(0, weight=0, minsize=110)
-        assign_tasks_frame.columnconfigure(1, weight=1)
+        assign_task_content.columnconfigure(0, weight=0, minsize=110)
+        assign_task_content.columnconfigure(1, weight=1)
         _AFW = 22  # same field width as left form for visual alignment
-        # modern header tint to match Students
-        try:
-            style.configure("Assign.TLabelframe", background="#F7FFF9")
-            style.configure(
-                "Assign.TLabelframe.Label",
-                background="#F7FFF9",
-                foreground="#0A2340",
-                font=("Segoe UI", 10, "bold"),
-            )
-            assign_tasks_frame.configure(style="Assign.TLabelframe")
-        except Exception:
-            pass
-
-        ttk.Label(assign_tasks_frame, text="Task Name:").grid(
+        tk.Label(assign_task_content, text="Task Name:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=0, column=0, padx=10, pady=6, sticky="w"
         )
-        self.task_name_entry = ctk.CTkEntry(assign_tasks_frame, width=220, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.task_name_entry = ctk.CTkEntry(
+            assign_task_content,
+            width=220,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="e.g. Prepare event proposal",
+        )
         self.task_name_entry.grid(row=0, column=1, padx=10, pady=6, sticky="ew")
 
-        ttk.Label(assign_tasks_frame, text="Committee:").grid(
+        tk.Label(assign_task_content, text="Committee:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=1, column=0, padx=10, pady=6, sticky="w"
         )
         self.task_committee_combo = ModernDropdown(
-            assign_tasks_frame, width=_AFW, state="readonly"
+            assign_task_content, width=_AFW, state="readonly"
         )
         self.task_committee_combo.grid(row=1, column=1, padx=10, pady=6, sticky="ew")
 
-        ttk.Label(assign_tasks_frame, text="Due Date (YYYY-MM-DD):").grid(
+        tk.Label(assign_task_content, text="Due Date (YYYY-MM-DD):", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=2, column=0, padx=10, pady=6, sticky="w"
         )
-        date_row = ttk.Frame(assign_tasks_frame, style="Card.TFrame")
+        date_row = tk.Frame(assign_task_content, bg="white")
         date_row.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
-        self.task_due_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.task_due_date_entry = ctk.CTkEntry(
+            date_row,
+            width=140,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="YYYY-MM-DD",
+        )
         self.task_due_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.task_due_date_entry).pack(
             side="left", padx=(4, 0)
         )
 
         add_task_button = ModernButton(
-            assign_tasks_frame,
+            assign_task_content,
             text="＋ Add Task",
             style="Add.TButton",
             command=self.add_task,
+            width=140,
+            height=38,
         )
         add_task_button.grid(
-            row=3, column=0, columnspan=2, pady=(12, 8), ipadx=8, ipady=2
+            row=3, column=1, padx=10, pady=(12, 8), sticky="w"
         )
 
         self.task_committee_combo.bind(
@@ -1592,49 +1855,66 @@ class AshscomGUI:
         )
         self._load_committees_for_task()
 
-        sep = ttk.Separator(assign_tasks_frame, orient="horizontal")
-        sep.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 4))
-        ttk.Label(
-            assign_tasks_frame,
+        # --- Assign Task to Member section (right) ---
+        assign_member_frame = tk.LabelFrame(
+            container,
             text="Assign Task to Member",
-            font=("Segoe UI", 9, "bold"),
-            foreground="#0A2340",
-        ).grid(row=5, column=0, columnspan=2, pady=(0, 6))
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
+        )
+        assign_member_frame.grid(row=0, column=2, sticky="nsew", padx=(5, 0), pady=5)
+        assign_member_frame.columnconfigure(0, weight=0, minsize=120)
+        assign_member_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(assign_tasks_frame, text="Task:").grid(
-            row=6, column=0, padx=10, pady=6, sticky="w"
+        tk.Label(
+            assign_member_frame, text="Choose the task, member, date, and status.",
+            bg="white", font=("Segoe UI", 9), fg=self.THEME["muted"]
+        ).grid(row=0, column=0, columnspan=2, padx=20, pady=(8, 6), sticky="w")
+
+        tk.Label(assign_member_frame, text="Task:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
+            row=1, column=0, padx=(20, 10), pady=6, sticky="w"
         )
         self.assign_task_combo = ModernDropdown(
-            assign_tasks_frame, width=_AFW, state="readonly"
+            assign_member_frame, width=_AFW, state="readonly"
         )
-        self.assign_task_combo.grid(row=6, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_task_combo.grid(row=1, column=1, padx=10, pady=6, sticky="ew")
 
-        ttk.Label(assign_tasks_frame, text="Member:").grid(
-            row=7, column=0, padx=10, pady=6, sticky="w"
+        tk.Label(assign_member_frame, text="Member:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
+            row=2, column=0, padx=(20, 10), pady=6, sticky="w"
         )
         self.assign_member_combo = ModernDropdown(
-            assign_tasks_frame, width=_AFW, state="readonly"
+            assign_member_frame, width=_AFW, state="readonly"
         )
-        self.assign_member_combo.grid(row=7, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_member_combo.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
 
-        ttk.Label(assign_tasks_frame, text="Date Assigned (YYYY-MM-DD):").grid(
-            row=8, column=0, padx=10, pady=6, sticky="w"
+        tk.Label(assign_member_frame, text="Date Assigned (YYYY-MM-DD):", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
+            row=3, column=0, padx=(20, 10), pady=6, sticky="w"
         )
-        date_row = ttk.Frame(assign_tasks_frame, style="Card.TFrame")
-        date_row.grid(row=8, column=1, padx=10, pady=6, sticky="ew")
-        self.assign_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
+        date_row = tk.Frame(assign_member_frame, bg="white")
+        date_row.grid(row=3, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_date_entry = ctk.CTkEntry(
+            date_row,
+            width=140,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="YYYY-MM-DD",
+        )
         self.assign_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.assign_date_entry).pack(
             side="left", padx=(4, 0)
         )
 
-        ttk.Label(assign_tasks_frame, text="Status:").grid(
-            row=9, column=0, padx=10, pady=6, sticky="w"
+        tk.Label(assign_member_frame, text="Status:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
+            row=4, column=0, padx=(20, 10), pady=6, sticky="w"
         )
         self.assign_status_combo = ModernDropdown(
-            assign_tasks_frame, width=_AFW, state="readonly"
+            assign_member_frame, width=_AFW, state="readonly"
         )
-        self.assign_status_combo.grid(row=9, column=1, padx=10, pady=6, sticky="ew")
+        self.assign_status_combo.grid(row=4, column=1, padx=10, pady=6, sticky="ew")
         self.assign_status_combo["values"] = [
             "Pending",
             "In Progress",
@@ -1645,14 +1925,14 @@ class AshscomGUI:
             self.assign_status_combo.current(0)
 
         assign_task_button = ModernButton(
-            assign_tasks_frame,
+            assign_member_frame,
             text="✓ Assign Task",
             style="Add.TButton",
             command=self.assign_task,
+            width=140,
+            height=38,
         )
-        assign_task_button.grid(
-            row=10, column=0, columnspan=2, pady=(12, 10), ipadx=8, ipady=2
-        )
+        assign_task_button.grid(row=5, column=1, padx=10, pady=(14, 10), sticky="w")
 
         self.assign_task_combo.bind("<<ComboboxSelected>>", self._clear_combo_highlight)
         self.assign_member_combo.bind(
@@ -1673,15 +1953,17 @@ class AshscomGUI:
         self.pages["task/assignment"] = settings_frame
 
         # --- lock cover (same passkey as students) ---
-        self.task_lock_frame = ttk.Frame(settings_frame)
+        self.task_lock_frame = tk.Frame(settings_frame, bg="white")
         self.task_lock_frame.grid(row=0, column=0, sticky="nsew")
 
-        lock_inner = ttk.Frame(self.task_lock_frame)
+        lock_inner = tk.Frame(self.task_lock_frame, bg="white")
         lock_inner.place(relx=0.5, rely=0.4, anchor="center")
-        ttk.Label(lock_inner, text="🔒", font=("Segoe UI", 40)).pack(pady=(0, 10))
-        ttk.Label(
+        tk.Label(lock_inner, text="🔒", bg="white", font=("Segoe UI", 40)).pack(pady=(0, 10))
+        tk.Label(
             lock_inner,
             text="Task records are protected.",
+            bg="white",
+            fg=self.THEME["text"],
             font=("Segoe UI", 11, "bold"),
         ).pack(pady=(0, 15))
         ModernButton(
@@ -1691,45 +1973,75 @@ class AshscomGUI:
             command=self._prompt_unlock_tasks,
         ).pack()
 
-        self.task_data_frame = ttk.Frame(settings_frame)
+        self.task_data_frame = tk.Frame(settings_frame, bg="white")
         self.task_data_frame.grid(row=0, column=0, sticky="nsew")
 
-        # modern pill sub-tabs — Tasks / Assignments
-        try:
-            style.configure("Modern.Sub.TNotebook", background="#F7FFF9", borderwidth=0)
-            style.configure(
-                "Modern.Sub.TNotebook.Tab",
-                padding=(18, 8),
-                font=("Segoe UI", 10, "bold"),
-                background="#EAFBEC",
-                foreground="#0A2340",
-            )
-            style.map(
-                "Modern.Sub.TNotebook.Tab",
-                background=[("selected", "#198754")],
-                foreground=[("selected", "white")],
-            )
-        except Exception:
-            pass
-        sub_notebook = ttk.Notebook(self.task_data_frame, style="Modern.Sub.TNotebook")
-        sub_notebook.pack(fill="both", expand=True, padx=15, pady=15)
+        # Custom white tab bar avoids the native notebook trough background.
+        tab_shell = tk.Frame(self.task_data_frame, bg="white")
+        tab_shell.pack(fill="both", expand=True, padx=15, pady=15)
+        tab_bar = tk.Frame(tab_shell, bg="white")
+        tab_bar.pack(fill="x")
+        tab_pages = tk.Frame(tab_shell, bg="white")
+        tab_pages.pack(fill="both", expand=True)
 
-        tasks_page = ttk.Frame(sub_notebook)
-        assignments_page = ttk.Frame(sub_notebook)
-        sub_notebook.add(tasks_page, text="Tasks")
-        sub_notebook.add(assignments_page, text="Assignments")
+        tasks_page = tk.Frame(tab_pages, bg="white")
+        assignments_page = tk.Frame(tab_pages, bg="white")
+        for page in (tasks_page, assignments_page):
+            page.grid(row=0, column=0, sticky="nsew")
+        tab_pages.rowconfigure(0, weight=1)
+        tab_pages.columnconfigure(0, weight=1)
+
+        tab_buttons = {}
+
+        def show_task_page(page_name):
+            page = tasks_page if page_name == "Tasks" else assignments_page
+            page.tkraise()
+            for name, button in tab_buttons.items():
+                button.configure(
+                    fg_color=self.THEME["green"] if name == page_name else "white",
+                    text_color="white" if name == page_name else self.THEME["navy"],
+                )
+
+        for name in ("Tasks", "Assignments"):
+            tab_buttons[name] = ctk.CTkButton(
+                tab_bar,
+                text=name,
+                command=lambda selected=name: show_task_page(selected),
+                fg_color="white",
+                hover_color="#87AECE",
+                text_color=self.THEME["navy"],
+                border_width=1,
+                border_color="#1D2A62",
+                font=("Segoe UI", 12, "bold"),
+                corner_radius=6,
+                width=132,
+                height=40,
+                cursor="hand2",
+            )
+            tab_buttons[name].pack(side="left", padx=(0, 4), pady=3)
+
+        show_task_page("Tasks")
 
         # --- TASKS SUBTAB ---
         tasks_page.columnconfigure(0, weight=1)
         tasks_page.rowconfigure(1, weight=1)
 
-        task_top_row = ttk.Frame(tasks_page)
+        task_top_row = tk.Frame(tasks_page, bg="white")
         task_top_row.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+        task_top_row.columnconfigure(0, weight=1)
 
         self.task_search_var = tk.StringVar()
-        ctk.CTkEntry(
-            task_top_row,
-            textvariable=self.task_search_var,
+        task_search_wrap = tk.Frame(task_top_row, bg="white")
+        task_search_wrap.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+        tk.Label(
+            task_search_wrap,
+            text="🔍",
+            bg="white",
+            fg=self.THEME["text"],
+            font=("Segoe UI", 12),
+        ).pack(side="left", padx=(0, 6))
+        task_search_entry = ctk.CTkEntry(
+            task_search_wrap,
             height=40,
             corner_radius=10,
             border_width=1,
@@ -1739,14 +2051,20 @@ class AshscomGUI:
             placeholder_text="Search tasks...",
             placeholder_text_color=self.THEME["muted"],
             font=("Segoe UI", 11),
-        ).pack(side="left", fill="x", expand=True, padx=(0, 12))
+        )
+        task_search_entry.pack(side="left", fill="x", expand=True)
+        task_search_entry.bind(
+            "<KeyRelease>", lambda e: self.task_search_var.set(task_search_entry.get())
+        )
         self.task_search_var.trace_add("write", lambda *args: self.refresh_task_table())
 
-        ttk.Label(task_top_row, text="Show Tasks:", font=("Segoe UI", 10, "bold")).pack(
-            side="left", padx=(12, 5)
+        task_filter_frame = tk.Frame(task_top_row, bg="white")
+        task_filter_frame.grid(row=0, column=1, sticky="w", padx=(5, 0))
+        tk.Label(task_filter_frame, text="Show Tasks:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).pack(
+            side="left", padx=(0, 5)
         )
         self.task_committee_filter = ModernDropdown(
-            task_top_row, width=18, state="readonly"
+            task_filter_frame, width=18, state="readonly"
         )
         self.task_committee_filter["values"] = ["All Committees"]
         self.task_committee_filter.set("All Committees")
@@ -1756,13 +2074,20 @@ class AshscomGUI:
             lambda e: (self.refresh_task_table(), self._clear_combo_highlight(e)),
         )
 
-        task_body = ttk.Frame(tasks_page)
+        task_body = tk.Frame(tasks_page, bg="white")
         task_body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
-        task_body.columnconfigure(0, weight=1)
+        task_body.columnconfigure(0, weight=3, minsize=520)
+        task_body.columnconfigure(1, weight=2, minsize=340)
         task_body.rowconfigure(0, weight=1)
 
-        task_tree_frame = ttk.LabelFrame(
-            task_body, text="Task List", style="Assign.TLabelframe"
+        task_tree_frame = tk.LabelFrame(
+            task_body,
+            text="Task List",
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
         )
         task_tree_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.tasks_tree = self._build_task_tree(task_tree_frame)
@@ -1770,23 +2095,51 @@ class AshscomGUI:
             "<<TreeviewSelect>>", lambda e: self._on_update_task_selected()
         )
 
-        task_form_frame = ttk.LabelFrame(
-            task_body, text="Update Task", style="Assign.TLabelframe"
+        task_form_frame = tk.LabelFrame(
+            task_body,
+            text="Update Task",
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
         )
-        task_form_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        task_form_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), ipadx=8)
         self._build_update_tasks(task_form_frame)
+        task_filter_frame.grid(sticky="ew")
+
+        def align_task_toolbar(event=None):
+            task_top_row.columnconfigure(0, weight=0)
+            task_top_row.columnconfigure(1, weight=1)
+            task_top_row.columnconfigure(
+                0, minsize=task_tree_frame.winfo_width() + 5
+            )
+
+        task_body.bind("<Configure>", align_task_toolbar, add="+")
+        task_tree_frame.bind("<Configure>", align_task_toolbar, add="+")
+        task_form_frame.bind("<Configure>", align_task_toolbar, add="+")
+        self.root.after_idle(align_task_toolbar)
 
         # --- ASSIGNMENTS SUBTAB ---
         assignments_page.columnconfigure(0, weight=1)
         assignments_page.rowconfigure(1, weight=1)
 
-        assign_top_row = ttk.Frame(assignments_page)
+        assign_top_row = tk.Frame(assignments_page, bg="white")
         assign_top_row.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+        assign_top_row.columnconfigure(0, weight=1)
 
         self.assignment_search_var = tk.StringVar()
-        ctk.CTkEntry(
-            assign_top_row,
-            textvariable=self.assignment_search_var,
+        assignment_search_wrap = tk.Frame(assign_top_row, bg="white")
+        assignment_search_wrap.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+        tk.Label(
+            assignment_search_wrap,
+            text="🔍",
+            bg="white",
+            fg=self.THEME["text"],
+            font=("Segoe UI", 12),
+        ).pack(side="left", padx=(0, 6))
+        assignment_search_entry = ctk.CTkEntry(
+            assignment_search_wrap,
             height=40,
             corner_radius=10,
             border_width=1,
@@ -1796,18 +2149,50 @@ class AshscomGUI:
             placeholder_text="Search assignments...",
             placeholder_text_color=self.THEME["muted"],
             font=("Segoe UI", 11),
-        ).pack(side="left", fill="x", expand=True, padx=(0, 12))
+        )
+        assignment_search_entry.pack(side="left", fill="x", expand=True)
+        assignment_search_entry.bind(
+            "<KeyRelease>",
+            lambda e: self.assignment_search_var.set(assignment_search_entry.get()),
+        )
         self.assignment_search_var.trace_add(
             "write", lambda *args: self.refresh_assignment_table()
         )
 
-        assign_body = ttk.Frame(assignments_page)
+        assignment_filter_frame = tk.Frame(assign_top_row, bg="white")
+        assignment_filter_frame.grid(row=0, column=1, sticky="w", padx=(5, 0))
+        tk.Label(
+            assignment_filter_frame,
+            text="Show Tasks:",
+            bg="white",
+            fg=self.THEME["text"],
+            font=("Segoe UI", 10, "bold"),
+        ).pack(side="left", padx=(0, 5))
+        self.assignment_task_filter = ModernDropdown(
+            assignment_filter_frame, width=18, state="readonly"
+        )
+        self.assignment_task_filter["values"] = ["All Tasks"]
+        self.assignment_task_filter.set("All Tasks")
+        self.assignment_task_filter.pack(side="left")
+        self.assignment_task_filter.bind(
+            "<<ComboboxSelected>>",
+            lambda e: (self.refresh_assignment_table(), self._clear_combo_highlight(e)),
+        )
+
+        assign_body = tk.Frame(assignments_page, bg="white")
         assign_body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
-        assign_body.columnconfigure(0, weight=1)
+        assign_body.columnconfigure(0, weight=3, minsize=620)
+        assign_body.columnconfigure(1, weight=2, minsize=340)
         assign_body.rowconfigure(0, weight=1)
 
-        assign_tree_frame = ttk.LabelFrame(
-            assign_body, text="Assignment List", style="Assign.TLabelframe"
+        assign_tree_frame = tk.LabelFrame(
+            assign_body,
+            text="Assignment List",
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
         )
         assign_tree_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.assignments_tree = self._build_assignment_tree(assign_tree_frame)
@@ -1815,11 +2200,29 @@ class AshscomGUI:
             "<<TreeviewSelect>>", lambda e: self._on_update_assignment_selected()
         )
 
-        assign_form_frame = ttk.LabelFrame(
-            assign_body, text="Update Assignment", style="Assign.TLabelframe"
+        assign_form_frame = tk.LabelFrame(
+            assign_body,
+            text="Update Assignment",
+            bg="white",
+            fg=self.THEME["navy"],
+            font=("Segoe UI", 11, "bold"),
+            bd=1,
+            relief="solid",
         )
-        assign_form_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        assign_form_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), ipadx=8)
         self._build_update_assignments(assign_form_frame)
+
+        def align_assignment_toolbar(event=None):
+            assign_top_row.columnconfigure(0, weight=0)
+            assign_top_row.columnconfigure(1, weight=1)
+            assign_top_row.columnconfigure(
+                0, minsize=assign_tree_frame.winfo_width() + 5
+            )
+
+        assign_body.bind("<Configure>", align_assignment_toolbar, add="+")
+        assign_tree_frame.bind("<Configure>", align_assignment_toolbar, add="+")
+        assign_form_frame.bind("<Configure>", align_assignment_toolbar, add="+")
+        self.root.after_idle(align_assignment_toolbar)
 
         self.task_lock_frame.tkraise()
 
@@ -1832,15 +2235,22 @@ class AshscomGUI:
         field_width = 20
         row_pady = 6
 
-        ttk.Label(parent, text="Task Name:").grid(
+        tk.Label(parent, text="Task Name:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=0, column=0, padx=10, pady=row_pady, sticky="w"
         )
-        self.update_task_name_entry = ctk.CTkEntry(parent, width=200, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.update_task_name_entry = ctk.CTkEntry(
+            parent,
+            width=200,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="e.g. Prepare event proposal",
+        )
         self.update_task_name_entry.grid(
             row=0, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
-        ttk.Label(parent, text="Committee:").grid(
+        tk.Label(parent, text="Committee:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=1, column=0, padx=10, pady=row_pady, sticky="w"
         )
         self.update_task_committee_combo = ModernDropdown(
@@ -1853,41 +2263,45 @@ class AshscomGUI:
             row=1, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
-        ttk.Label(parent, text="Due Date:").grid(
+        tk.Label(parent, text="Due Date:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=2, column=0, padx=10, pady=row_pady, sticky="w"
         )
-        date_row = ttk.Frame(parent, style="Card.TFrame")
+        date_row = tk.Frame(parent, bg="white")
         date_row.grid(row=2, column=1, padx=10, pady=row_pady, sticky="ew")
-        self.update_task_due_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.update_task_due_date_entry = ctk.CTkEntry(
+            date_row,
+            width=140,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="YYYY-MM-DD",
+        )
         self.update_task_due_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.update_task_due_date_entry).pack(
             side="left", padx=(4, 0)
         )
 
-        task_button_row = ttk.Frame(parent)
-        task_button_row.grid(
-            row=3, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
-        )
-        task_button_row.columnconfigure(0, weight=1)
-        task_button_row.columnconfigure(1, weight=1)
-
         self.task_update_btn = ModernButton(
-            task_button_row,
+            parent,
             text="🔼 Update Task",
             style="Update.TButton",
             command=self.update_task,
             state="disabled",
+            width=140,
+            height=38,
         )
-        self.task_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
+        self.task_update_btn.grid(row=3, column=1, padx=10, pady=(14, 8), sticky="w")
 
         self.task_delete_btn = ModernButton(
-            task_button_row,
+            parent,
             text="🗑 Delete Task",
             style="Delete.TButton",
             command=self.delete_task,
             state="disabled",
+            width=140,
+            height=38,
         )
-        self.task_delete_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
+        self.task_delete_btn.grid(row=4, column=1, padx=10, pady=(0, 16), sticky="w")
 
     def _build_update_assignments(self, parent):
         parent.columnconfigure(0, weight=0, minsize=110)
@@ -1895,7 +2309,7 @@ class AshscomGUI:
         field_width = 20
         row_pady = 6
 
-        ttk.Label(parent, text="Task:").grid(
+        tk.Label(parent, text="Task:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=0, column=0, padx=10, pady=row_pady, sticky="w"
         )
         self.update_assignment_task_entry = ModernDropdown(
@@ -1908,7 +2322,7 @@ class AshscomGUI:
             row=0, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
-        ttk.Label(parent, text="Member:").grid(
+        tk.Label(parent, text="Member:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=1, column=0, padx=10, pady=row_pady, sticky="w"
         )
         self.update_assignment_member_combo = ModernDropdown(
@@ -1921,18 +2335,25 @@ class AshscomGUI:
             row=1, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
-        ttk.Label(parent, text="Date Assigned:").grid(
+        tk.Label(parent, text="Date Assigned:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=2, column=0, padx=10, pady=row_pady, sticky="w"
         )
-        date_row = ttk.Frame(parent, style="Card.TFrame")
+        date_row = tk.Frame(parent, bg="white")
         date_row.grid(row=2, column=1, padx=10, pady=row_pady, sticky="ew")
-        self.update_assignment_date_entry = ctk.CTkEntry(date_row, width=140, height=38, corner_radius=10, border_color="#B8CBD8")
+        self.update_assignment_date_entry = ctk.CTkEntry(
+            date_row,
+            width=140,
+            height=38,
+            corner_radius=10,
+            border_color="#B8CBD8",
+            placeholder_text="YYYY-MM-DD",
+        )
         self.update_assignment_date_entry.pack(side="left")
         self._calendar_btn(date_row, self.update_assignment_date_entry).pack(
             side="left", padx=(4, 0)
         )
 
-        ttk.Label(parent, text="Status:").grid(
+        tk.Label(parent, text="Status:", bg="white", fg=self.THEME["text"], font=("Segoe UI", 10, "bold")).grid(
             row=3, column=0, padx=10, pady=row_pady, sticky="w"
         )
         self.update_assignment_status_combo = ModernDropdown(
@@ -1945,30 +2366,27 @@ class AshscomGUI:
             row=3, column=1, padx=10, pady=row_pady, sticky="ew"
         )
 
-        assignment_button_row = ttk.Frame(parent)
-        assignment_button_row.grid(
-            row=4, column=0, columnspan=2, padx=10, pady=(10, 4), sticky="ew"
-        )
-        assignment_button_row.columnconfigure(0, weight=1)
-        assignment_button_row.columnconfigure(1, weight=1)
-
         self.assignment_update_btn = ModernButton(
-            assignment_button_row,
+            parent,
             text="🔼 Update Assignment",
             style="Update.TButton",
             command=self.update_assignment,
             state="disabled",
+            width=140,
+            height=38,
         )
-        self.assignment_update_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
+        self.assignment_update_btn.grid(row=4, column=1, padx=10, pady=(14, 8), sticky="w")
 
         self.assignment_delete_btn = ModernButton(
-            assignment_button_row,
+            parent,
             text="🗑 Delete Assignment",
             style="Delete.TButton",
             command=self.delete_assignment,
             state="disabled",
+            width=140,
+            height=38,
         )
-        self.assignment_delete_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
+        self.assignment_delete_btn.grid(row=5, column=1, padx=10, pady=(0, 16), sticky="w")
 
     def _on_update_task_selected(self):
         selected = self.tasks_tree.focus()
@@ -1985,6 +2403,11 @@ class AshscomGUI:
         self.update_task_due_date_entry.delete(0, tk.END)
         self.update_task_due_date_entry.insert(0, values[3] if values[3] else "")
         self._selected_task_id = values[0]
+        self._selected_task_original = (
+            values[1] or "",
+            values[2] or "",
+            values[3] or "",
+        )
         self.task_update_btn.config(state="normal")
         self.task_delete_btn.config(state="normal")
 
@@ -2003,6 +2426,12 @@ class AshscomGUI:
         self.update_assignment_date_entry.insert(0, values[3] if values[3] else "")
         self.update_assignment_status_combo.set(values[4] if values[4] else "")
         self._selected_assignment_id = values[0]
+        self._selected_assignment_original = (
+            values[1] or "",
+            values[2] or "",
+            values[3] or "",
+            values[4] or "",
+        )
         self.assignment_update_btn.config(state="normal")
         self.assignment_delete_btn.config(state="normal")
 
@@ -2051,16 +2480,20 @@ class AshscomGUI:
             search_inner, text="🔍", bg="white", fg="#6B6B6B", font=("Segoe UI", 10)
         ).pack(side="left", padx=(8, 4), pady=3)
         self.task_search_var = tk.StringVar()
-        task_search_entry = tk.Entry(
+        task_search_entry = ctk.CTkEntry(
             search_inner,
-            textvariable=self.task_search_var,
-            bg="white",
-            fg="#0F1A0F",
-            relief="flat",
+            placeholder_text="Search tasks...",
+            placeholder_text_color="#6B6B6B",
+            height=32,
+            fg_color="white",
+            text_color="#0F1A0F",
+            border_width=0,
             font=("Segoe UI", 10),
-            bd=0,
         )
         task_search_entry.pack(side="left", fill="x", expand=True, ipady=3, padx=(0, 8))
+        task_search_entry.bind(
+            "<KeyRelease>", lambda e: self.task_search_var.set(task_search_entry.get())
+        )
         self.task_search_var.trace_add("write", lambda *args: self.refresh_task_table())
 
     def _build_assignment_update_form(self, parent):
@@ -2124,17 +2557,22 @@ class AshscomGUI:
             search_inner, text="🔍", bg="white", fg="#6B6B6B", font=("Segoe UI", 10)
         ).pack(side="left", padx=(8, 4), pady=3)
         self.assignment_search_var = tk.StringVar()
-        assignment_search_entry = tk.Entry(
+        assignment_search_entry = ctk.CTkEntry(
             search_inner,
-            textvariable=self.assignment_search_var,
-            bg="white",
-            fg="#0F1A0F",
-            relief="flat",
+            placeholder_text="Search assignments...",
+            placeholder_text_color="#6B6B6B",
+            height=32,
+            fg_color="white",
+            text_color="#0F1A0F",
+            border_width=0,
             font=("Segoe UI", 10),
-            bd=0,
         )
         assignment_search_entry.pack(
             side="left", fill="x", expand=True, ipady=3, padx=(0, 8)
+        )
+        assignment_search_entry.bind(
+            "<KeyRelease>",
+            lambda e: self.assignment_search_var.set(assignment_search_entry.get()),
         )
         self.assignment_search_var.trace_add(
             "write", lambda *args: self.refresh_assignment_table()
@@ -2182,8 +2620,8 @@ class AshscomGUI:
         tree_scroll_y = ctk.CTkScrollbar(
             tree_frame,
             orientation="vertical",
-            width=14,
-            corner_radius=7,
+            width=12,
+            corner_radius=6,
             fg_color="#E6EDF2",
             button_color="#9FB0BE",
             button_hover_color=self.THEME["green"],
@@ -2192,8 +2630,8 @@ class AshscomGUI:
         tree_scroll_x = ctk.CTkScrollbar(
             tree_frame,
             orientation="horizontal",
-            height=14,
-            corner_radius=7,
+            height=12,
+            corner_radius=6,
             fg_color="#E6EDF2",
             button_color="#9FB0BE",
             button_hover_color=self.THEME["green"],
@@ -2210,6 +2648,15 @@ class AshscomGUI:
         tree.pack(fill="both", expand=True, padx=6, pady=6)
         tree_scroll_y.configure(command=tree.yview)
         tree_scroll_x.configure(command=tree.xview)
+        self.assignment_no_results_label = tk.Label(
+            tree_frame,
+            text="No results found.",
+            bg="white",
+            fg=self.THEME["muted"],
+            font=("Segoe UI", 11, "italic"),
+        )
+        self.assignment_no_results_label.place(relx=0.5, rely=0.5, anchor="center")
+        self.assignment_no_results_label.lower()
 
         tree["columns"] = (
             "id",
@@ -2219,15 +2666,25 @@ class AshscomGUI:
             "status",
         )
         tree.column("#0", width=0, stretch=tk.NO)
-        tree.column("id", width=60, anchor=tk.CENTER, stretch=True)
-        tree.column("task_name", width=260, anchor=tk.W, stretch=True)
-        tree.column("assigned_to", width=220, anchor=tk.W, stretch=True)
-        tree.column("date_assigned", width=140, anchor=tk.CENTER, stretch=True)
-        tree.column("status", width=120, anchor=tk.CENTER, stretch=True)
+        assignment_column_widths = {
+            "id": (45, 45),
+            "task_name": (175, 150),
+            "assigned_to": (150, 130),
+            "date_assigned": (120, 115),
+            "status": (125, 110),
+        }
+        for column, (width, minwidth) in assignment_column_widths.items():
+            tree.column(
+                column,
+                width=width,
+                minwidth=minwidth,
+                anchor=tk.CENTER,
+                stretch=column == "status",
+            )
 
         tree.heading("id", text="ID", anchor=tk.CENTER)
-        tree.heading("task_name", text="Task Name", anchor=tk.W)
-        tree.heading("assigned_to", text="Assigned To", anchor=tk.W)
+        tree.heading("task_name", text="Task Name", anchor=tk.CENTER)
+        tree.heading("assigned_to", text="Assigned To", anchor=tk.CENTER)
         tree.heading("date_assigned", text="Date Assigned", anchor=tk.CENTER)
         tree.heading("status", text="Status", anchor=tk.CENTER)
 
@@ -2257,18 +2714,36 @@ class AshscomGUI:
     def refresh_assignment_table(self):
         for item in self.assignments_tree.get_children():
             self.assignments_tree.delete(item)
+        self.assignment_no_results_label.lower()
 
         query = (
             self.assignment_search_var.get().strip().lower()
             if hasattr(self, "assignment_search_var")
             else ""
         )
+        task_filter = (
+            self.assignment_task_filter.get()
+            if hasattr(self, "assignment_task_filter")
+            else "All Tasks"
+        )
         rows = [
             row
             for row in getattr(self, "_assignment_rows", [])
-            if not query
-            or any(query in str(field).lower() for field in row if field is not None)
+            if task_filter == "All Tasks" or row[1] == task_filter
         ]
+        rows = [
+            row
+            for row in rows
+            if not query
+            or any(
+                query in str(row[index]).lower()
+                for index in range(len(row))
+                if row[index] is not None
+            )
+        ]
+        if not rows:
+            self.assignment_no_results_label.lift()
+            return
         for index, row in enumerate(rows):
             tag = "evenrow" if index % 2 == 0 else "oddrow"
             self.assignments_tree.insert("", tk.END, values=row, tags=(tag,))
@@ -2311,6 +2786,11 @@ class AshscomGUI:
         task_name = self.update_task_name_entry.get().strip()
         committee_name = self.update_task_committee_combo.get()
         due_date = self.update_task_due_date_entry.get().strip()
+        if (task_name, committee_name, due_date) == getattr(
+            self, "_selected_task_original", None
+        ):
+            messagebox.showinfo("No Changes", "No task fields were changed.")
+            return
         committee_id = next(
             (cid for cid, name in self.committees_list if name == committee_name),
             None,
@@ -2360,6 +2840,11 @@ class AshscomGUI:
         member_name = self.update_assignment_member_combo.get()
         date_assigned = self.update_assignment_date_entry.get().strip()
         status = self.update_assignment_status_combo.get()
+        if (task_name, member_name, date_assigned, status) == getattr(
+            self, "_selected_assignment_original", None
+        ):
+            messagebox.showinfo("No Changes", "No assignment fields were changed.")
+            return
         task_id = next(
             (tid for tid, name in self.tasks_list if name == task_name), None
         )
@@ -2417,14 +2902,21 @@ class AshscomGUI:
 
         try:
             cursor = self.connection.cursor()
+            cursor.execute("DELETE FROM Assignment WHERE TaskID=%s", (task_id,))
             cursor.execute("DELETE FROM Task WHERE TaskID=%s", (task_id,))
             self.connection.commit()
             cursor.close()
+            self._tasks_rows = [
+                row for row in getattr(self, "_tasks_rows", []) if row[0] != task_id
+            ]
             self.load_tasks()
             self._load_tasks_for_assignment()
+            self.load_assignments()
             self.update_task_name_entry.delete(0, tk.END)
             self.update_task_committee_combo.set("")
             self.update_task_due_date_entry.delete(0, tk.END)
+            self._selected_task_id = None
+            self._selected_task_original = None
             self.task_update_btn.config(state="disabled")
             self.task_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Task deleted successfully.")
@@ -2452,11 +2944,18 @@ class AshscomGUI:
             )
             self.connection.commit()
             cursor.close()
+            self._assignment_rows = [
+                row
+                for row in getattr(self, "_assignment_rows", [])
+                if row[0] != assignment_id
+            ]
             self.load_assignments()
             self.update_assignment_task_entry.set("")
             self.update_assignment_member_combo.set("")
             self.update_assignment_date_entry.delete(0, tk.END)
             self.update_assignment_status_combo.set("")
+            self._selected_assignment_id = None
+            self._selected_assignment_original = None
             self.assignment_update_btn.config(state="disabled")
             self.assignment_delete_btn.config(state="disabled")
             messagebox.showinfo("Success", "Assignment deleted successfully.")
@@ -2480,6 +2979,12 @@ class AshscomGUI:
                 self.task_committee_filter["values"] = [
                     "All Committees"
                 ] + committee_names
+            if hasattr(self, "assignment_task_filter"):
+                task_names = [r[1] for r in rows if r[1]]
+                self.assignment_task_filter["values"] = [
+                    "All Tasks"
+                ] + task_names
+                self.assignment_task_filter.set("All Tasks")
             self.refresh_task_table()
             if hasattr(self, "update_assignment_task_entry"):
                 self.update_assignment_task_entry["values"] = [
@@ -2495,6 +3000,7 @@ class AshscomGUI:
     def refresh_task_table(self):
         for item in self.tasks_tree.get_children():
             self.tasks_tree.delete(item)
+        self.task_no_results_label.lower()
 
         rows = getattr(self, "_tasks_rows", [])
 
@@ -2515,8 +3021,16 @@ class AshscomGUI:
             rows = [
                 row
                 for row in rows
-                if any(query in str(f).lower() for f in row if f is not None)
+                if any(
+                    query in str(value).lower()
+                    for value in row
+                    if value is not None
+                )
             ]
+
+        if not rows:
+            self.task_no_results_label.lift()
+            return
 
         for index, row in enumerate(rows):
             tag = "evenrow" if index % 2 == 0 else "oddrow"
@@ -2544,9 +3058,17 @@ class AshscomGUI:
                 row
                 for row in data
                 if any(
-                    query in str(field).lower() for field in row if field is not None
+                    query in str(value).lower()
+                    for value in row
+                    if value is not None
                 )
             ]
+
+        if not data:
+            self.no_results_label.lift()
+            return
+
+        self.no_results_label.lower()
 
         for i, row in enumerate(data):
             tag = "evenrow" if i % 2 == 0 else "oddrow"
@@ -2564,11 +3086,14 @@ class AshscomGUI:
         return [name for (_id, name) in self.committees_list]
 
     # Student management methods
-    def add_student(self):
+    def add_student(self, button_requested=False):
+        if not button_requested:
+            return
+
         name = self.name_entry.get().strip()
         grade = self.grade_entry.get().strip()
         section = self.section_entry.get().strip()
-        email = self.email_entry.get().strip() + "@addu.edu.ph"
+        email_username = self.email_entry.get().strip()
         committee_name = self.committee_combo.get()
         role = self.role_combo.get()
 
@@ -2581,15 +3106,17 @@ class AshscomGUI:
         if not section:
             messagebox.showwarning("Input Error", "Section is required.")
             return
-        if not email:
+        if not email_username:
             messagebox.showwarning("Input Error", "Email is required.")
             return
-        if not committee_name and not role:
-            messagebox.showwarning(
-                "Input Error",
-                "Please select a role for the Student. If the Student is an Election Candidate, please select the Committee and Role accordingly.",
-            )
+        if not committee_name:
+            messagebox.showwarning("Input Error", "Committee is required.")
             return
+        if not role:
+            messagebox.showwarning("Input Error", "Role is required.")
+            return
+
+        email = email_username + "@addu.edu.ph"
 
         if not self._verify_pin("add this student"):
             return
@@ -2625,6 +3152,7 @@ class AshscomGUI:
             messagebox.showinfo("Success", "Student added successfully.")
             self.clear_add_form()
             self.load_students()
+            self._load_members_for_assignment()
         except Error as e:
             messagebox.showerror("Database Error", f"Failed to add student: {e}")
 
@@ -2645,6 +3173,8 @@ class AshscomGUI:
         self.edit_email_entry.delete(0, tk.END)
         self.edit_committee_combo.set("")
         self.edit_role_combo.set("")
+        self._selected_student_id = None
+        self._selected_student_original = None
 
     def _prompt_unlock(self):
         dialog = tk.Toplevel(self.root)
@@ -2655,18 +3185,21 @@ class AshscomGUI:
         dialog.grab_set()
 
         dialog.update_idletasks()
-        w, h = 340, 205
+        w, h = 300, 230
         x = (dialog.winfo_screenwidth() // 2) - (w // 2)
         y = (dialog.winfo_screenheight() // 2) - (h // 2)
         dialog.geometry(f"{w}x{h}+{x}+{y}")
         content = tk.Frame(dialog, bg="#F7FFF9")
         content.pack(fill="both", expand=True, padx=20, pady=15)
 
-        ttk.Label(
+        tk.Label(
             content,
             text="Enter passkey to view student records:",
+            bg="#F7FFF9",
+            fg=self.THEME["text"],
             font=("Segoe UI", 10),
-        ).pack(anchor="w", pady=(0, 8))
+            justify="center",
+        ).pack(fill="x", pady=(0, 8))
 
         entry_var = tk.StringVar()
         entry = ctk.CTkEntry(
@@ -2678,16 +3211,17 @@ class AshscomGUI:
             border_color=self.THEME["border"],
             fg_color=self.THEME["card"],
             text_color=self.THEME["text"],
-            show="*",
-            font=("Segoe UI", 11),
+            show="•",
+            font=("Segoe UI", 14),
+            justify="center",
         )
-        entry.pack(fill="x", pady=(0, 10))
+        entry.pack(anchor="center", pady=(0, 10))
         entry.focus_set()
 
         show_var = tk.BooleanVar(value=False)
 
         def toggle_show():
-            entry.configure(show="" if show_var.get() else "*")
+            entry.configure(show="" if show_var.get() else "•")
 
         ctk.CTkCheckBox(
             content,
@@ -2703,7 +3237,7 @@ class AshscomGUI:
             checkbox_width=20,
             checkbox_height=20,
             font=("Segoe UI", 12),
-        ).pack(anchor="w", pady=(0, 15))
+        ).pack(anchor="center", pady=(0, 15))
 
         error_label = tk.Label(
             content,
@@ -2711,8 +3245,10 @@ class AshscomGUI:
             bg="#F7FFF9",
             fg=self.THEME["danger"],
             font=("Segoe UI", 9),
-            anchor="w",
+            anchor="center",
+            justify="center",
         )
+        error_label.pack(fill="x", pady=(0, 8))
 
         result = {"value": None}
 
@@ -2721,7 +3257,6 @@ class AshscomGUI:
                 result["value"] = entry_var.get()
                 dialog.destroy()
             else:
-                error_label.pack(fill="x", pady=(0, 8), before=btn_row)
                 error_label.config(text="Incorrect passkey. Please try again.")
                 entry.selection_range(0, tk.END)
                 entry.focus_set()
@@ -2759,15 +3294,20 @@ class AshscomGUI:
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.update_idletasks()
-        w, h = 340, 205
+        w, h = 300, 230
         x = (dialog.winfo_screenwidth() // 2) - (w // 2)
         y = (dialog.winfo_screenheight() // 2) - (h // 2)
         dialog.geometry(f"{w}x{h}+{x}+{y}")
         content = tk.Frame(dialog, bg="#F7FFF9")
         content.pack(fill="both", expand=True, padx=20, pady=15)
-        ttk.Label(
-            content, text="Enter passkey to view tasks:", font=("Segoe UI", 10)
-        ).pack(anchor="w", pady=(0, 8))
+        tk.Label(
+            content,
+            text="Enter passkey to view tasks:",
+            bg="#F7FFF9",
+            fg=self.THEME["text"],
+            font=("Segoe UI", 10),
+            justify="center",
+        ).pack(fill="x", pady=(0, 8))
         entry_var = tk.StringVar()
         entry = ctk.CTkEntry(
             content,
@@ -2778,15 +3318,16 @@ class AshscomGUI:
             border_color=self.THEME["border"],
             fg_color=self.THEME["card"],
             text_color=self.THEME["text"],
-            show="*",
-            font=("Segoe UI", 11),
+            show="•",
+            font=("Segoe UI", 14),
+            justify="center",
         )
-        entry.pack(fill="x", pady=(0, 10))
+        entry.pack(anchor="center", pady=(0, 10))
         entry.focus_set()
         show_var = tk.BooleanVar(value=False)
 
         def toggle_show():
-            entry.configure(show="" if show_var.get() else "*")
+            entry.configure(show="" if show_var.get() else "•")
 
         ctk.CTkCheckBox(
             content,
@@ -2802,15 +3343,17 @@ class AshscomGUI:
             checkbox_width=20,
             checkbox_height=20,
             font=("Segoe UI", 12),
-        ).pack(anchor="w", pady=(0, 15))
+        ).pack(anchor="center", pady=(0, 15))
         error_label = tk.Label(
             content,
-            text="",
+            text=" ",
             bg="#F7FFF9",
             fg=self.THEME["danger"],
             font=("Segoe UI", 9),
-            anchor="w",
+            anchor="center",
+            justify="center",
         )
+        error_label.pack(fill="x", pady=(0, 8))
         result = {"value": None}
 
         def confirm():
@@ -2818,7 +3361,6 @@ class AshscomGUI:
                 result["value"] = entry_var.get()
                 dialog.destroy()
             else:
-                error_label.pack(fill="x", pady=(0, 8), before=btn_row)
                 error_label.config(text="Incorrect passkey. Please try again.")
                 entry.selection_range(0, tk.END)
                 entry.focus_set()
@@ -2856,7 +3398,7 @@ class AshscomGUI:
         dialog.grab_set()
 
         dialog.update_idletasks()
-        w, h = 300, 170
+        w, h = 300, 215
         x = (dialog.winfo_screenwidth() // 2) - (w // 2)
         y = (dialog.winfo_screenheight() // 2) - (h // 2)
         dialog.geometry(f"{w}x{h}+{x}+{y}")
@@ -2864,12 +3406,15 @@ class AshscomGUI:
         content = tk.Frame(dialog, bg="#F7FFF9")
         content.pack(fill="both", expand=True, padx=20, pady=15)
 
-        ttk.Label(
+        tk.Label(
             content,
             text=f"Enter 4-digit PIN to {action_label}:",
+            bg="#F7FFF9",
+            fg=self.THEME["text"],
             font=("Segoe UI", 10),
             wraplength=260,
-        ).pack(anchor="w", pady=(0, 8))
+            justify="center",
+        ).pack(fill="x", pady=(0, 8))
 
         vcmd = (dialog.register(lambda s: s.isdigit() and len(s) <= 4 or s == ""), "%P")
 
@@ -2878,7 +3423,7 @@ class AshscomGUI:
             content,
             textvariable=pin_var,
             width=10,
-            show="*",
+            show="•",
             justify="center",
             font=("Segoe UI", 14),
             validate="key",
@@ -2886,6 +3431,27 @@ class AshscomGUI:
         )
         entry.pack(pady=(0, 15))
         entry.focus_set()
+
+        show_var = tk.BooleanVar(value=False)
+
+        def toggle_show():
+            entry.configure(show="" if show_var.get() else "•")
+
+        ctk.CTkCheckBox(
+            content,
+            text="Show passkey",
+            variable=show_var,
+            command=toggle_show,
+            text_color=self.THEME["text"],
+            fg_color=self.THEME["green"],
+            hover_color=self.THEME["green_dark"],
+            border_color=self.THEME["border"],
+            border_width=1,
+            corner_radius=4,
+            checkbox_width=20,
+            checkbox_height=20,
+            font=("Segoe UI", 11),
+        ).pack(anchor="center", pady=(0, 15))
 
         result = {"value": None}
 
@@ -2919,6 +3485,10 @@ class AshscomGUI:
     def on_student_select(self, tree):
         selected = tree.focus()
         if selected:
+            if "no_results" in tree.item(selected, "tags"):
+                tree.selection_remove(selected)
+                tree.focus("")
+                return
             values = tree.item(selected, "values")
             if values:
                 self.edit_name_entry.delete(0, tk.END)
@@ -2934,6 +3504,14 @@ class AshscomGUI:
                 self.edit_committee_combo.set(values[5] if values[5] else "")
                 self.edit_role_combo.set(values[6] if values[6] else "")
                 self._selected_student_id = values[0]
+                self._selected_student_original = (
+                    values[1] or "",
+                    grade_value,
+                    values[3] or "",
+                    values[4].replace("@addu.edu.ph", "") if values[4] else "",
+                    values[5] or "",
+                    values[6] or "",
+                )
                 self.update_btn.config(state="normal")
                 self.delete_btn.config(state="normal")
         else:
@@ -2954,6 +3532,18 @@ class AshscomGUI:
         email = self.edit_email_entry.get().strip() + "@addu.edu.ph"
         committee_name = self.edit_committee_combo.get()
         role = self.edit_role_combo.get()
+
+        current_values = (
+            name,
+            grade,
+            section,
+            self.edit_email_entry.get().strip(),
+            committee_name,
+            role,
+        )
+        if current_values == getattr(self, "_selected_student_original", None):
+            messagebox.showinfo("No Changes", "No student fields were changed.")
+            return
 
         if not name:
             messagebox.showwarning("Input Error", "Student name is required.")
@@ -3133,6 +3723,9 @@ class AshscomGUI:
             # Populate the combobox with task names
             task_names = [name for (_id, name) in self.tasks_list]
             self.assign_task_combo["values"] = task_names
+            if hasattr(self, "assignment_task_filter"):
+                self.assignment_task_filter["values"] = ["All Tasks"] + task_names
+                self.assignment_task_filter.set("All Tasks")
             if task_names:
                 self.assign_task_combo.current(0)
         except Error as e:

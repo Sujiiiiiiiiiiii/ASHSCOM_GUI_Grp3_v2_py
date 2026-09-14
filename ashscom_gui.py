@@ -1,3 +1,4 @@
+import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 from types import SimpleNamespace
@@ -768,7 +769,7 @@ class AshscomGUI:
         header_canvas = tk.Canvas(self.root, height=112, highlightthickness=0, bg="#24551B")
         header_canvas.pack(fill="x")
 
-        logo1_img = Image.open("ateneo1.png").resize((58, 58))
+        logo1_img = Image.open(os.path.join(os.path.dirname(__file__), "ateneo1.png")).resize((58, 58))
         self.logo1 = ImageTk.PhotoImage(logo1_img)
 
         logo2_img = Image.open("ashscom.png").resize((70, 70))
@@ -1450,26 +1451,6 @@ class AshscomGUI:
         )
 
         self.lock_frame.tkraise()
-
-    def create_tasks_assignments_tab(self, parent):
-        settings_frame = ctk.CTkFrame(parent, fg_color=self.THEME["card"], corner_radius=0)
-        settings_frame.grid(row=0, column=0, sticky="nsew")
-        self.pages["tasks/assignments"] = settings_frame
-
-        overview_frame = ttk.LabelFrame(
-            settings_frame, text="Task/Assignment Management"
-        )
-        overview_frame.pack(fill="both", expand=True, padx=15, pady=15)
-
-        overview_frame.columnconfigure(0, weight=0)
-        overview_frame.columnconfigure(1, weight=1)
-        overview_frame.rowconfigure(0, weight=1)
-
-        form_frame = ttk.LabelFrame(overview_frame, text="Update Task/Assignment")
-        form_frame.grid(row=0, column=0, sticky="new", padx=(10, 5), pady=(10, 11))
-
-        left_col = ttk.Frame(overview_frame)
-        left_col.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
 
     def _build_student_tree(self, parent):
         tree_frame = ctk.CTkFrame(
@@ -3183,11 +3164,24 @@ class AshscomGUI:
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
         dialog.update_idletasks()
-        w, h = 300, 230
-        x = (dialog.winfo_screenwidth() // 2) - (w // 2)
-        y = (dialog.winfo_screenheight() // 2) - (h // 2)
+        w, h = 320, 230
+        try:
+            rx = self.root.winfo_rootx()
+            ry = self.root.winfo_rooty()
+            rw = self.root.winfo_width()
+            rh = self.root.winfo_height()
+            x = rx + (rw // 2 - w // 2)
+            y = ry + (rh // 2 - h // 2)
+            sw = dialog.winfo_screenwidth()
+            sh = dialog.winfo_screenheight()
+            x = max(0, min(x, sw - w - 10))
+            y = max(0, min(y, sh - h - 10))
+        except Exception:
+            x = (dialog.winfo_screenwidth() // 2) - (w // 2)
+            y = (dialog.winfo_screenheight() // 2) - (h // 2)
         dialog.geometry(f"{w}x{h}+{x}+{y}")
         content = tk.Frame(dialog, bg="#F7FFF9")
         content.pack(fill="both", expand=True, padx=20, pady=15)
@@ -3197,7 +3191,7 @@ class AshscomGUI:
             text="Enter passkey to view student records:",
             bg="#F7FFF9",
             fg=self.THEME["text"],
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 10, "bold"),
             justify="center",
         ).pack(fill="x", pady=(0, 8))
 
@@ -3293,10 +3287,23 @@ class AshscomGUI:
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
         dialog.update_idletasks()
-        w, h = 300, 230
-        x = (dialog.winfo_screenwidth() // 2) - (w // 2)
-        y = (dialog.winfo_screenheight() // 2) - (h // 2)
+        w, h = 320, 230
+        try:
+            rx = self.root.winfo_rootx()
+            ry = self.root.winfo_rooty()
+            rw = self.root.winfo_width()
+            rh = self.root.winfo_height()
+            x = rx + (rw // 2 - w // 2)
+            y = ry + (rh // 2 - h // 2)
+            sw = dialog.winfo_screenwidth()
+            sh = dialog.winfo_screenheight()
+            x = max(0, min(x, sw - w - 10))
+            y = max(0, min(y, sh - h - 10))
+        except Exception:
+            x = (dialog.winfo_screenwidth() // 2) - (w // 2)
+            y = (dialog.winfo_screenheight() // 2) - (h // 2)
         dialog.geometry(f"{w}x{h}+{x}+{y}")
         content = tk.Frame(dialog, bg="#F7FFF9")
         content.pack(fill="both", expand=True, padx=20, pady=15)
@@ -3305,7 +3312,7 @@ class AshscomGUI:
             text="Enter passkey to view tasks:",
             bg="#F7FFF9",
             fg=self.THEME["text"],
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 10, "bold"),
             justify="center",
         ).pack(fill="x", pady=(0, 8))
         entry_var = tk.StringVar()
@@ -3396,11 +3403,24 @@ class AshscomGUI:
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
 
         dialog.update_idletasks()
         w, h = 300, 215
-        x = (dialog.winfo_screenwidth() // 2) - (w // 2)
-        y = (dialog.winfo_screenheight() // 2) - (h // 2)
+        try:
+            rx = self.root.winfo_rootx()
+            ry = self.root.winfo_rooty()
+            rw = self.root.winfo_width()
+            rh = self.root.winfo_height()
+            x = rx + (rw // 2 - w // 2)
+            y = ry + (rh // 2 - h // 2)
+            sw = dialog.winfo_screenwidth()
+            sh = dialog.winfo_screenheight()
+            x = max(0, min(x, sw - w - 10))
+            y = max(0, min(y, sh - h - 10))
+        except Exception:
+            x = (dialog.winfo_screenwidth() // 2) - (w // 2)
+            y = (dialog.winfo_screenheight() // 2) - (h // 2)
         dialog.geometry(f"{w}x{h}+{x}+{y}")
 
         content = tk.Frame(dialog, bg="#F7FFF9")

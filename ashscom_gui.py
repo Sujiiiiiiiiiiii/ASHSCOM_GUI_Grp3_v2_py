@@ -772,7 +772,7 @@ class AshscomGUI:
         logo1_img = Image.open(os.path.join(os.path.dirname(__file__), "ateneo1.png")).resize((58, 58))
         self.logo1 = ImageTk.PhotoImage(logo1_img)
 
-        logo2_img = Image.open("ashscom.png").resize((70, 70))
+        logo2_img = Image.open(os.path.join(os.path.dirname(__file__), "ashscom.png")).resize((70, 70))
         self.logo2 = ImageTk.PhotoImage(logo2_img)
 
         # Modernized scrollbars
@@ -1209,7 +1209,19 @@ class AshscomGUI:
     def create_students_tab(self, parent):
         settings_frame = ctk.CTkFrame(parent, fg_color=self.THEME["card"], corner_radius=0)
         settings_frame.grid(row=0, column=0, sticky="nsew")
+        settings_frame.rowconfigure(0, weight=1)
+        settings_frame.columnconfigure(0, weight=1)
         self.pages["students"] = settings_frame
+
+        # full-screen lock overlay - only lock, not layout
+        self.lock_frame = tk.Frame(settings_frame, bg="white")
+        self.lock_frame.grid(row=0, column=0, sticky="nsew")
+        self.lock_frame.lift()
+        lock_inner = tk.Frame(self.lock_frame, bg="white")
+        lock_inner.place(relx=0.5, rely=0.4, anchor="center")
+        tk.Label(lock_inner, text="🔒", bg="white", font=("Segoe UI", 40)).pack(pady=(0, 10))
+        tk.Label(lock_inner, text="Student records are protected.", bg="white", fg=self.THEME["text"], font=("Segoe UI", 11, "bold")).pack(pady=(0, 15))
+        ModernButton(lock_inner, text="🔍 View Students", style="Add.TButton", command=self._prompt_unlock).pack()
 
         overview_frame = tk.Frame(
             settings_frame,
@@ -1217,7 +1229,7 @@ class AshscomGUI:
             padx=10,
             pady=10,
         )
-        overview_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        overview_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         overview_frame.columnconfigure(0, weight=1, minsize=460)
         overview_frame.columnconfigure(1, weight=2, minsize=520)
@@ -1374,30 +1386,11 @@ class AshscomGUI:
         right_col.rowconfigure(0, weight=1)
         right_col.columnconfigure(0, weight=1)
 
-        # Lock screen - shown by default
-        self.lock_frame = tk.Frame(right_col, bg="white")
-        self.lock_frame.grid(row=0, column=0, sticky="nsew")
-
-        lock_inner = tk.Frame(self.lock_frame, bg="white")
-        lock_inner.place(relx=0.5, rely=0.4, anchor="center")
-        tk.Label(lock_inner, text="🔒", bg="white", font=("Segoe UI", 40)).pack(pady=(0, 10))
-        tk.Label(
-            lock_inner,
-            text="Student records are protected.",
-            bg="white",
-            fg=self.THEME["text"],
-            font=("Segoe UI", 11, "bold"),
-        ).pack(pady=(0, 15))
-        ModernButton(
-            lock_inner,
-            text="🔍 View Students",
-            style="Add.TButton",
-            command=self._prompt_unlock,
-        ).pack()
-
-        # Data screen - hidden until unlocked
+        # Data area (right side) - hidden behind lock until unlock
         self.data_frame = tk.Frame(right_col, bg="white")
         self.data_frame.grid(row=0, column=0, sticky="nsew")
+        right_col.rowconfigure(0, weight=1)
+        right_col.columnconfigure(0, weight=1)
 
         view_row = tk.Frame(self.data_frame, bg="white")
         view_row.pack(fill="x", padx=8, pady=(10, 8))
@@ -3275,7 +3268,7 @@ class AshscomGUI:
         if entered is None:
             return
         if entered == self.STUDENT_PASSKEY:
-            self.data_frame.tkraise()
+            self.lock_frame.grid_forget()
             self.load_students()
         else:
             return

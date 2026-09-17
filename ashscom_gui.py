@@ -3245,7 +3245,7 @@ class AshscomGUI:
                 dialog.destroy()
             else:
                 error_label.config(text="Incorrect passkey. Please try again.")
-                entry.selection_range(0, tk.END)
+                entry.select_range(0, tk.END)
                 entry.focus_set()
 
         def cancel():
